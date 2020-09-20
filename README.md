@@ -42,7 +42,7 @@ Arguments are handled as follows:
    Note that it does not matter where the keyword appears, relative to
    other arguments.
 
-4. Any other string, number, or pathname is directly added to the list
+4. Any other string, integer, or pathname is directly added to the list
    of arguments. (Note it is an error if a pathname begins with `-`.)
 
 ## Entry points
@@ -98,9 +98,9 @@ You can also specify the directory with `:in`:
 
 ## Controlling with hooks
 
-There are two hooks you can use to control `cmd`. These are exported from the `cmd/hooks` package (so you can `:use :cmd`) without having to worry about them. Both hooks expect a function of one argument.
+There are two hooks you can use to control `cmd`. These are exported from the `cmd/hooks` package (so you can `:use :cmd` without having to worry about them.) Both hooks expect a list of functions of one argument.
 
-The hook `*message-hook*`, if provided, is called with the external program and its arguments, quoted like a shell command. This can be useful for logging commands as they are run.
+The hook `*message-hook*` is called with the external program and its arguments, quoted as a shell command line. This can be useful for logging commands as they are run.
 
 The hook `*proc-hook*` is called with the process object (as returned by `uiop:launch-program`). This can be useful if you want to be able to track what is being run in a particular dynamic extent.
 
@@ -118,7 +118,7 @@ Recent versions of GNU `env` support a `-C` switch to do this without having to 
 
 ## History
 
-Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired by the `cmd` in [Shake][], a Haskell build system.
+Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired by the `cmd` function in [Shake][], a Haskell build system.
 
 [UIOP]: https://common-lisp.net/project/asdf/uiop.html
 [Overlord]: https://github.com/ruricolist/overlord
