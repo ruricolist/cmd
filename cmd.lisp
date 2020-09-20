@@ -2,6 +2,8 @@
   (:nicknames #:cmd)
   (:use #:cl #:alexandria #:serapeum #:cmd/hooks)
   (:import-from :uiop
+                :pathname-equal
+                :getcwd
                 :os-unix-p
                 :native-namestring
                 :native-namestring
@@ -300,6 +302,8 @@ executable."
 The OS-level current directory is per-process, not per thread. Using
 `chdir' could lead to race conditions. Instead, we arrange for the new
 process to change its own working directory."
+  (when (pathname-equal dir (getcwd))
+    (return-from wrap-with-dir tokens))
   (destructuring-bind (command . args) tokens
     (cond (*can-use-env-c*
            ;; When there is a recent version of GNU env installed, the
