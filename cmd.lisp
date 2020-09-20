@@ -154,8 +154,9 @@ executable."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
     (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
     (setf args (expand-keyword-abbrevs args))
-    (run-hook *message-hook*
-              (fmt "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens)))
+    (when *message-hook*
+      (run-hook *message-hook*
+                (fmt "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens))))
     (destructuring-bind (&key (output *standard-output*)
                               (error-output *error-output*)
                          &allow-other-keys)
