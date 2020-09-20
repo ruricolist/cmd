@@ -13,6 +13,7 @@
   (:import-from :shlex)
   (:export
     :cmd :$cmd :cmd? :cmd&
+    :pipeline                           ;Not yet implemented.
     :with-cmd-dir))
 (in-package :cmd)
 
