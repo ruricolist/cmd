@@ -95,6 +95,7 @@
          `(locally (declare (notinline ,',name))
             (,',name ,@(simplify-cmd-args (cons cmd args))))))))
 
+(-> $cmd (&rest t) string)
 (define-cmd-variant $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell."
@@ -105,13 +106,15 @@ newlines, like $(cmd) would in a shell."
             :output s
             args))))
 
+(-> cmd? (&rest t) (values boolean integer &optional))
 (define-cmd-variant cmd? (cmd &rest args)
   (let ((exit-code
           (apply #'cmd
                  cmd
                  :ignore-error-status t
                  args)))
-    (if (zerop exit-code) t
+    (if (zerop exit-code)
+        (values t 0)
         (values nil exit-code))))
 
 (define-cmd-variant cmd (cmd &rest args)
@@ -149,6 +152,7 @@ executable."
            :ignore-error-status (getf args :ignore-error-status)
            :tokens tokens)))
 
+(-> cmd& (&rest t) (values uiop/launch-program::process-info list list &optional))
 (define-cmd-variant cmd& (cmd &rest args)
   "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
