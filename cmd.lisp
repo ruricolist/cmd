@@ -56,7 +56,7 @@
   '((:in :directory _)
     (:< :input _)
     ((:> :1>) :output _)
-    (:>> :if-output-exists :append :output _)
+    ((:>> :1>>) :if-output-exists :append :output _)
     (:2> :error-output _)
     (:2>> :if-error-output-exists :append :error-output _)
     ((:&> :>&)
