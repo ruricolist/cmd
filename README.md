@@ -1,17 +1,17 @@
 # cmd
 
-Cmd is a DSL for running external programs, building on top of [UIOP][]. 
+A DSL for running external programs, built on [UIOP][]. 
 
 Cmd is designed to:
 
-1. Be easy to use.
+1. Be natural to use.
 2. Protect against shell interpolation.
 3. Be usable from multi-threaded programs.
 4. Support Windows.
 
 ## Argument handling
 
-Calling `cmd` always invokes a program directly and passes it a fixed list of arguments; arguments to `cmd` are *never* passed to a shell for interpretation.
+Calling `cmd` always invokes a program directly; arguments to `cmd` are *never* passed to a shell for interpretation.
 
 Arguments are handled as follows:
 
@@ -29,8 +29,8 @@ Arguments are handled as follows:
 2. A list of strings is added directly to the list of arguments (not
    tokenized). (Putting a string in a list is “escaping” it.)
 
-3. A literal keyword, along with the next value, is pass through as
-   keyword argument to UIOP.
+3. A literal keyword, along with the next value, is passed through as
+   a keyword argument to UIOP.
 
    ``` lisp
    # See `cmd?` below.
@@ -42,17 +42,18 @@ Arguments are handled as follows:
    Note that it does not matter where the keyword appears, relative to
    other arguments.
 
-4. Any other string, number, or pathname is directly added to the
-   list of arguments. (It is an error if a pathname begins with `-`!)
+4. Any other string, number, or pathname is directly added to the list
+   of arguments. (Note it is an error if a pathname begins with `-`.)
 
 ## Entry points
 
 The `cmd` package offers several entry points:
 
-- `cmd` just wraps `uiop:run-program`.
+- `cmd` runs an external program synchronously.
 - `$cmd` returns the output of the external program as a string, stripping any trailing newline.
 - `cmd?` returns `t` if the external program returned `0`, and `nil` otherwise, with the exit code as a second value. (All other entry points signal en error if the program returns non-zero.) This is useful for programs that are expected to fail.
-- `cmd&` launches a background process (with `uiop:launch-program`) and returns the process.
+- `cmd&` runs an external program asynchronously (with
+  `uiop:launch-program`) and returns a UIOP process-info object.
 
 ## Redirection
 
@@ -86,7 +87,7 @@ Supported directions are:
 
 ## The external program’s working directory
 
-Cmd is designed to be used from multi-threaded programs. It always runs programs in the current directory, where the current directory is defined by [`*default-pathname-defaults*`][dpd]. This is because the “current directory” of a program, on both Windows and Unix, is specific to the thread, not the process.
+Cmd is designed to be used from multi-threaded programs. It always runs programs with their working directory defined by [`*default-pathname-defaults*`][dpd]. This is because the “current directory” of a program, on both Windows and Unix, is specific to the thread, not the process.
 
 You can also specify the directory with `:in`:
 
