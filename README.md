@@ -38,7 +38,6 @@ Arguments are handled as follows:
    a keyword argument to UIOP.
 
    ``` lisp
-   # See `cmd?` below.
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
    ≡ (cmd :ignore-error-status t "bash -c 'exit 1'")
    ≡ (cmd "bash -c" :ignore-error-status t '("exit 1"))
@@ -53,8 +52,8 @@ Arguments are handled as follows:
 
 ## The external program’s working directory
 
-Cmd is designed to be used from multi-threaded programs. It always
-runs programs with their working directory relative to
+Cmd is designed with multi-threaded programs in mind. It always runs
+programs with their working directory relative to
 [`*default-pathname-defaults*`][dpd]. This is because the “current
 directory” of a program, on both Windows and Unix, is specific to the
 thread, not the process.
@@ -72,7 +71,8 @@ keyword argument `:in`:
 
 The `cmd` package offers several entry points:
 
-- `cmd` runs an external program synchronously.
+- `cmd` runs an external program synchronously, returning the exit
+  code. By default, on a non-zero exit it signals an error.
 
   ```lisp
   (cmd "cat /etc/os-release")
@@ -89,10 +89,9 @@ The `cmd` package offers several entry points:
   ```
 
 - `cmd?` returns `t` if the external program returned `0`, and `nil`
-  otherwise, with the exit code as a second value. (All other entry
-  points signal en error if the program returns non-zero.) As other
-  variants by default signal an error if the process exists non-zero,
-  `cmd?` is useful for programs that are expected to fail.
+  otherwise, with the exit code as a second value. As other variants
+  by default signal an error if the process exists non-zero, `cmd?` is
+  useful for programs that are expected to fail.
 
   ```lisp
   (cmd? "kill -0" pid)
@@ -101,7 +100,7 @@ The `cmd` package offers several entry points:
   ```
 
 - `cmd&` runs an external program asynchronously (with
-  `uiop:launch-program`) and returns a UIOP process-info object.
+  `uiop:launch-program`) and returns a UIOP `process-info` object.
 
   ```lisp
   (cmd& "cp -a" src dest)
@@ -154,11 +153,11 @@ On Windows only, the first argument (the program name) has .exe appended to it a
 
 ## Efficiency
 
-While `cmd` does not use a shell to interpret its arguments, it does still have to run a shell (`sh` on Unix, `cmd.exe` on Windows) in order to change the working directory of the program (using [Bernstein chaining][]).
+While `cmd` does not use a shell to interpret its arguments, it does still have to run a shell (`sh` on Unix, `cmd.exe` on Windows) in order to change the working directory of the program.
 
 How inefficient this is depends on what your distribution uses as a shell; it is faster when `sh` is, say, `dash`, than when it is `bash`.
 
-Recent versions of GNU `env` support a `-C` switch to do this without having to run a shell. When that is supported (support is detected dynamically on Lisp startup) then `env -C` is used in place of a shell and overhead is negligible.
+Recent versions of GNU `env` support a `-C` switch to do this directly. When that is supported (support is detected dynamically) then `env -C` is used in place of a shell and overhead is negligible.
 
 ## Past
 
@@ -166,7 +165,7 @@ Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired b
 
 ## Future
 
-I plan to support at least inline shell-style redirection (e.g. `(cmd "sth file > other-file")`) and pipelines.
+I plan to support at least inline redirection (e.g. `(cmd "sth file > other-file")`) and pipelines.
 
 [UIOP]: https://common-lisp.net/project/asdf/uiop.html
 [Overlord]: https://github.com/ruricolist/overlord
