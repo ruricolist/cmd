@@ -1,6 +1,6 @@
 # cmd
 
-A DSL for running external programs, built on [UIOP][].
+A utility for running external programs, built on [UIOP][].
 
 Cmd is designed to:
 
