@@ -54,9 +54,10 @@ Arguments are handled as follows:
 
 Cmd is designed with multi-threaded programs in mind. It always runs
 programs with their working directory relative to
-[`*default-pathname-defaults*`][dpd]. This is because the “current
-directory” of a program, on both Windows and Unix, is specific to the
-thread, not the process.
+[`*default-pathname-defaults*`][dpd]. This is because the OS-level
+working directory a program, on both Windows and Unix, is the working
+directory of the entire process, not the individual thread, and
+changing it changes it for all threads.
 
 You can also specify the directory for a particular command with the
 keyword argument `:in`:
