@@ -14,7 +14,7 @@
   (:import-from :trivia :match)
   (:import-from :shlex)
   (:export
-    :cmd :$cmd :cmd? :cmd&
+    :cmd :$cmd :cmd? :cmd! :cmd&
     :pipeline                           ;Not yet implemented.
     :with-cmd-dir))
 (in-package :cmd)
@@ -119,6 +119,16 @@ newlines, like $(cmd) would in a shell."
     (if (zerop exit-code)
         (values t 0)
         (values nil exit-code))))
+
+(-> cmd! (&rest t) (values &optional))
+(define-cmd-variant cmd! (cmd &rest args)
+  "Run CMD purely for its side effects, discarding all output and returning nothing."
+  (apply #'cmd
+         cmd
+         :output nil
+         :error-output nil
+         args)
+  (values))
 
 (define-cmd-variant cmd (cmd &rest args)
   "Run a program.
