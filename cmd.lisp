@@ -114,11 +114,15 @@ By default stderr is discarded."
 
 (-> cmd? (&rest t) (values boolean integer &optional))
 (define-cmd-variant cmd? (cmd &rest args)
+  "Run a program, returning T if it passed, nil otherwise.
+By default the output is discarded."
   (let ((exit-code
-          (apply #'cmd
-                 cmd
-                 :ignore-error-status t
-                 args)))
+          (multiple-value-call #'cmd
+            cmd
+            :ignore-error-status t
+            (values-list args)
+            :output nil
+            :error-output nil)))
     (if (zerop exit-code)
         (values t 0)
         (values nil exit-code))))
