@@ -101,13 +101,16 @@
 (-> $cmd (&rest t) string)
 (define-cmd-variant $cmd (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
-newlines, like $(cmd) would in a shell."
+newlines, like $(cmd) would in a shell.
+
+By default stderr is discarded."
   (chomp
    (with-output-to-string (s)
-     (apply #'cmd
-            cmd
-            :output s
-            args))))
+     (multiple-value-call #'cmd
+       cmd
+       :output s
+       (values-list args)
+       :error-output nil))))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
 (define-cmd-variant cmd? (cmd &rest args)
