@@ -19,6 +19,10 @@
     :with-cmd-dir))
 (in-package :cmd)
 
+(deftype absolute-directory-pathname ()
+  `(and (satisfies absolute-pathname-p)
+        (satisfies directory-pathname-p)))
+
 (defun current-dir ()
   (let ((dpd *default-pathname-defaults*))
     (if (typep dpd 'absolute-directory-pathname)
