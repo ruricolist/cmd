@@ -20,7 +20,7 @@
 (in-package :cmd)
 
 (deftype absolute-directory-pathname ()
-  `(and (satisfies absolute-pathname-p)
+  '(and (satisfies absolute-pathname-p)
         (satisfies directory-pathname-p)))
 
 (defun current-dir ()
