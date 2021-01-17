@@ -240,6 +240,21 @@ executable."
     (run-hook *proc-hook* proc)
     proc))
 
+;;; From https://GitHub.com/GrammaTech/cl-utils/blob/master/shell.lisp
+;;; (MIT license).
+(defun kill-process (process &key urgent)
+  "Terminate PROCESS and all its descendants.
+On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
+  (if (os-unix-p)
+      ;; Kill the entire process group (process and its children).
+      (uiop:run-program
+       (fmt "kill -~d -$(ps -o pgid= ~d | tr -d ' ')"
+            (if urgent 9 15)
+            (uiop:process-info-pid process)))
+      ;; If non-unix, utilize the standard terminate process
+      ;; which should be acceptable in most cases.
+      (uiop:terminate-process process :urgent urgent)))
+
 (defun await (proc &key ignore-error-status tokens)
   "Wait for PROC to finish."
   (nest
@@ -267,7 +282,7 @@ executable."
                      status)))
           (setf abnormal? nil))
      (when abnormal?
-       (uiop:terminate-process proc)))))
+       (kill-process proc)))))
 
 (defun parse-cmd-args (args)
   (nlet rec ((args args)
