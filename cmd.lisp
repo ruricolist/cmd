@@ -19,6 +19,14 @@
     :with-cmd-dir))
 (in-package :cmd)
 
+;;; External executables, isolated for Guix compatibility.
+(def +env+ "env")
+(def +kill+ "kill")
+(def +ps+ "ps")
+(def +pwd+ "pwd")
+(def +sh+ "/bin/sh")
+(def +tr+ "tr")
+
 (defun current-dir ()
   (let ((dpd *default-pathname-defaults*))
     (if (typep dpd 'absolute-directory-pathname)
@@ -36,10 +44,10 @@
        (zerop
         (nth-value 2
           (uiop:run-program
-           `("env" "-C"
-                   ,(native-namestring
-                     (user-homedir-pathname))
-                   "pwd")
+           `(,+env+ "-C"
+                    ,(native-namestring
+                      (user-homedir-pathname))
+                    "pwd")
            :ignore-error-status t
            :output nil
            :error-output nil)))))
@@ -248,9 +256,12 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
   (if (os-unix-p)
       ;; Kill the entire process group (process and its children).
       (uiop:run-program
-       (fmt "kill -~d -$(ps -o pgid= ~d | tr -d ' ')"
+       (fmt "~a -~d -$(~a -o pgid= ~d | ~a -d ' ')"
+            +kill+
             (if urgent 9 15)
-            (uiop:process-info-pid process)))
+            +ps+
+            (uiop:process-info-pid process)
+            +tr+))
       ;; If non-unix, utilize the standard terminate process
       ;; which should be acceptable in most cases.
       (uiop:terminate-process process :urgent urgent)))
@@ -341,9 +352,9 @@ process to change its own working directory."
            ;; When there is a recent version of GNU env installed, the
            ;; -C switch lets us do Bernstein chaining without spinning
            ;; up a shell.
-           `("env" "-C" ,dir ,command ,@args))
+           `(,+env+ "-C" ,dir ,command ,@args))
           ((not (os-windows-p))
-           `("/bin/sh"
+           `(,+sh+
              "-c"
              ;; Use Bernstein chaining; change to the directory in $1,
              ;; shift, and exec the rest of the argument array.
