@@ -253,7 +253,10 @@ executable."
 (defun kill-process (process &key urgent)
   "Terminate PROCESS and all its descendants.
 On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
-  (if (os-unix-p)
+  (if (and (os-unix-p)
+           ;; ECL doesn't start a new process group for
+           ;; launch-program, so this would kill the Lisp process.
+           (not (eql :ecl (uiop:implementation-type))))
       ;; Kill the entire process group (process and its children).
       (uiop:run-program
        (fmt "~a -~d -$(~a -o pgid= ~d | ~a -d ' ')"
