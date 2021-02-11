@@ -113,12 +113,17 @@ newlines, like $(cmd) would in a shell.
 
 By default stderr is discarded."
   (chomp
-   (with-output-to-string (s)
-     (multiple-value-call #'cmd
-       cmd
-       :output s
-       (values-list args)
-       :error-output nil))))
+   (multiple-value-bind (proc tokens args)
+       (multiple-value-call #'cmd&
+         cmd
+         :output :stream
+         (values-list args)
+         :error-output nil)
+     (let ((output (uiop:slurp-stream-string (uiop:process-info-output proc))))
+       (await proc
+           :ignore-error-status (getf args :ignore-error-status)
+           :tokens tokens)
+       output))))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
 (define-cmd-variant cmd? (cmd &rest args)
