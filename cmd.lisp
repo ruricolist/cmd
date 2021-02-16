@@ -115,9 +115,8 @@ By default stderr is discarded."
   (chomp
    (with-output-to-string (s)
      (multiple-value-call #'cmd
-       cmd
        :output s
-       (values-list args)
+       cmd (values-list args)
        :error-output nil))))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
@@ -126,9 +125,8 @@ By default stderr is discarded."
 By default the output is discarded."
   (let ((exit-code
           (multiple-value-call #'cmd
-            cmd
             :ignore-error-status t
-            (values-list args)
+            cmd (values-list args)
             :output nil
             :error-output nil)))
     (if (zerop exit-code)
@@ -139,10 +137,9 @@ By default the output is discarded."
 (define-cmd-variant cmd! (cmd &rest args)
   "Run CMD purely for its side effects, discarding all output and returning nothing."
   (apply #'cmd
-         cmd
          :output nil
          :error-output nil
-         args)
+         cmd args)
   (values))
 
 (define-cmd-variant cmd (cmd &rest args)
