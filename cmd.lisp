@@ -142,6 +142,7 @@ By default the output is discarded."
          cmd args)
   (values))
 
+(-> cmd (&rest t) (values integer &optional))
 (define-cmd-variant cmd (cmd &rest args)
   "Run a program.
 
