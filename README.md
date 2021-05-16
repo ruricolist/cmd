@@ -9,6 +9,23 @@ Cmd is designed to:
 3. Be usable from multi-threaded programs.
 4. Support Windows.
 
+## Load with quicklisp
+
+Clone this repo into a directory [quicklisp](https://www.quicklisp.org/beta/) monitors (a la `ql:*local-project-directories*` below)
+```
+(setq saveto (namestring (merge-pathnames (car ql:*local-project-directories*) #p"cmd")))
+(uiop:run-program (list "git" "clone" "https://github.com/ruricolist/cmd" saveto))
+;; e.g. git clone https://github.com/ruricolist/cmd /usr/lib/quicklisp/cmd
+(ql:quickload :cmd)
+```
+
+Notes/consideations:
+  * use a non-system quicklisp local directory. `(pushnew #P"/home/USER/src/quicklisp/" ql:*local-project-directories*)` in e.g. `~/.sbclrc`
+  * consider [`ultralisp`](https://ultralisp.org/). A recent version (2020-09) of `serapeum` is required to avoid the error in [pull#4](https://github.com/ruricolist/cmd/pull/4)
+   > unknown type specifier: CMD/CMD::ABSOLUTE-DIRECTORY-PATHNAME
+
+
+
 ## Argument handling
 
 Arguments to `cmd` are *never* passed to a shell for interpretation.
