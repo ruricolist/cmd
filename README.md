@@ -140,6 +140,8 @@ Supported directions are:
 - `:&>`, `:>&` Redirect stdout and stderr.
 - `:&>>`, `:>>&` Append stdout and stderr.
 
+Note that redirections are interpreted according to the rules for Lisp keywords (only the first occurrence of a keyword argument matter), not the side-effecting rules for redirections in POSIX shells.
+
 ## Controlling cmd with hooks
 
 There are two hooks you can use to control `cmd`. These are exported from the `cmd/hooks` package (so you can `:use :cmd` without having to worry about them.) Both hooks expect a list of functions of one argument.
