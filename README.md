@@ -139,6 +139,7 @@ Supported directions are:
 - `:2>>` Append stderr.
 - `:&>`, `:>&` Redirect stdout and stderr.
 - `:&>>`, `:>>&` Append stdout and stderr.
+- `:<<<` Provide input from a “here string”.
 
 Note that redirections are interpreted according to the rules for Lisp keywords (only the first occurrence of a keyword argument matter), not the side-effecting rules for redirections in POSIX shells.
 

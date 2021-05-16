@@ -1,5 +1,6 @@
 (defpackage :cmd/test
   (:use :cl :cmd/cmd :fiveam :alexandria :serapeum)
+  (:import-from :uiop :os-unix-p)
   (:export :run-tests))
 (in-package :cmd/test)
 
@@ -13,15 +14,22 @@
   (signals error
     (eval '(cmd "ls" #p"-file"))))
 
-(test unix-cmd
-  (if (uiop:os-unix-p)
-      (progn
-        (is (equal* "hello"
-                    ($cmd "echo hello")
-                    ($cmd '("echo" "hello"))
-                    ($cmd "echo" #p"hello")
-                    ($cmd '("echo" #p "hello"))))
-        (let ((file (asdf:system-relative-pathname :cmd "test/literal.txt")))
-          (is (equal (chomp (read-file-into-string file))
-                     ($cmd "cat" file)))))
-      (skip "Not on Unix")))
+(defmacro unix-test (name &body body)
+  `(test ,name
+     (if (os-unix-p)
+         (progn ,@body)
+         (skip "Not on Unix"))))
+
+(unix-test unix-cmd
+  (is (equal* "hello"
+              ($cmd "echo hello")
+              ($cmd '("echo" "hello"))
+              ($cmd "echo" #p"hello")
+              ($cmd '("echo" #p "hello"))))
+  (let ((file (asdf:system-relative-pathname :cmd "test/literal.txt")))
+    (is (equal (chomp (read-file-into-string file))
+               ($cmd "cat" file)))))
+
+(unix-test here-string
+  (is (equal ($cmd "bash -c" '("read x; echo \"$x\"") :<<< "hello")
+             "hello")))

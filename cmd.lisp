@@ -188,16 +188,29 @@ executable."
       (run-hook *message-hook*
                 (fmt "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens))))
     (destructuring-bind (&key (output *standard-output*)
-                              (error-output *error-output*)
+                           (error-output *error-output*)
                          &allow-other-keys)
         args
-      (values
-       (multiple-value-call #'launch-program-in-dir*
-         tokens
-         (values-list args)
-         :output output
-         :error-output error-output)
-       tokens args))))
+      (flet ((launch (args)
+               (values
+                (multiple-value-call #'launch-program-in-dir*
+                  tokens
+                  (values-list args)
+                  :output output
+                  :error-output error-output)
+                tokens args)))
+        (if-let (here-string (getf args :<<<))
+          (with-input-from-string (in here-string)
+            (launch
+             ;; Insert the new redirection in the same place as the
+             ;; old one to make sure keyword-override rules are
+             ;; respected.
+             (let* ((suffix (member :<<< args))
+                    (prefix (ldiff suffix args)))
+               (append prefix
+                       (list :input in)
+                       (cddr suffix)))))
+          (launch args))))))
 
 (defun simplify-cmd-args (args)
   (nlet rec ((args-in args)
