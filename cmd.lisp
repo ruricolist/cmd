@@ -15,8 +15,10 @@
   (:import-from :shlex)
   (:export
     :cmd :$cmd :cmd? :cmd! :cmd&
+    :sh :$sh :sh? :sh! :sh&
     :pipeline                           ;Not yet implemented.
-    :with-cmd-dir))
+    :with-cmd-dir
+    :*shell*))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -26,6 +28,17 @@
 (def +pwd+ "pwd")
 (def +sh+ "/bin/sh")
 (def +tr+ "tr")
+
+(defvar *shell*
+  (let ((shell (getenv "SHELL")))
+    (if (emptyp shell)
+        (if (os-unix-p)
+            +sh+
+            "cmd.exe")
+        shell))
+  "The shell to use for shell commands.
+
+Defaults to $SHELL.")
 
 (defun current-dir ()
   (let ((dpd *default-pathname-defaults*))
@@ -96,7 +109,7 @@
   (with-thunk (body)
     `(call/cmd-dir ,body ,dir)))
 
-(defmacro define-cmd-variant (name lambda-list &body body)
+(defmacro define-cmd-variant (name sh-name lambda-list &body body)
   (let ((docstring (and (stringp (car body)) (pop body))))
     `(progn
        (defun ,name ,lambda-list
@@ -104,10 +117,29 @@
          ,@body)
        (define-compiler-macro ,name (cmd &rest args)
          `(locally (declare (notinline ,',name))
-            (,',name ,@(simplify-cmd-args (cons cmd args))))))))
+            (,',name ,@(simplify-cmd-args (cons cmd args)))))
+       (defun ,sh-name (cmd &rest kwargs &key &allow-other-keys)
+         ,(fmt "Like `~(~a~)' for a shell command.
+
+Takes a single argument (along with keyword arguments for redirection)
+and passes it to a shell.
+
+The shell defaults to the value of `cmd:*shell*' (which in turn
+defaults to the value of SHELL in the environment)."
+               name)
+         (apply #'as-shell #',name cmd kwargs)))))
+
+(defun shell-arg ()
+  ;; NB Even Powershell supports -c.
+  (if (equal *shell* "cmd.exe") "/c" "-c"))
+
+;; Inline so it propagates the ftype.
+(defsubst as-shell (fn cmd &rest kwargs &key &allow-other-keys)
+  (declare (function fn) (string cmd))
+  (apply fn *shell* (shell-arg) (list cmd) kwargs))
 
 (-> $cmd (&rest t) string)
-(define-cmd-variant $cmd (cmd &rest args)
+(define-cmd-variant $cmd $sh (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell.
 
@@ -120,9 +152,11 @@ By default stderr is discarded."
        :error-output nil))))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
-(define-cmd-variant cmd? (cmd &rest args)
+(define-cmd-variant cmd? sh? (cmd &rest args)
   "Run a program, returning T if it passed, nil otherwise.
-By default the output is discarded."
+By default the output is discarded.
+
+Returns the actual exit code as a second value."
   (let ((exit-code
           (multiple-value-call #'cmd
             :ignore-error-status t
@@ -134,7 +168,7 @@ By default the output is discarded."
         (values nil exit-code))))
 
 (-> cmd! (&rest t) (values &optional))
-(define-cmd-variant cmd! (cmd &rest args)
+(define-cmd-variant cmd! sh! (cmd &rest args)
   "Run CMD purely for its side effects, discarding all output and returning nothing."
   (apply #'cmd
          :output nil
@@ -143,7 +177,7 @@ By default the output is discarded."
   (values))
 
 (-> cmd (&rest t) (values integer &optional))
-(define-cmd-variant cmd (cmd &rest args)
+(define-cmd-variant cmd sh (cmd &rest args)
   "Run a program.
 
 CMD should be a string naming a program. This command will be run with
@@ -179,7 +213,7 @@ executable."
            :tokens tokens)))
 
 (-> cmd& (&rest t) (values uiop/launch-program::process-info list list &optional))
-(define-cmd-variant cmd& (cmd &rest args)
+(define-cmd-variant cmd& sh& (cmd &rest args)
   "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
     (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))

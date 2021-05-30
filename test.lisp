@@ -25,11 +25,15 @@
               ($cmd "echo hello")
               ($cmd '("echo" "hello"))
               ($cmd "echo" #p"hello")
-              ($cmd '("echo" #p "hello"))))
+              ($cmd '("echo" #p "hello"))
+              ($sh "echo hello")
+              ($sh "echo 'hello'")
+              ($sh "echo \"hello")))
   (let ((file (asdf:system-relative-pathname :cmd "test/literal.txt")))
     (is (equal (chomp (read-file-into-string file))
                ($cmd "cat" file)))))
 
 (unix-test here-string
-  (is (equal ($cmd "bash -c" '("read x; echo \"$x\"") :<<< "hello")
-             "hello")))
+  (is (equal* ($cmd "bash -c" '("read x; echo \"$x\"") :<<< "hello")
+              ($sh "read x; echo \"$x\"" :<<< "hello")
+              "hello")))
