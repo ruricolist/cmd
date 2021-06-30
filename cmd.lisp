@@ -18,7 +18,11 @@
     :sh :$sh :sh? :sh! :sh&
     :pipeline                           ;Not yet implemented.
     :with-cmd-dir
-    :*shell*))
+    :*shell*
+    :*visual-commands*
+    :*command-wrappers*
+    :*terminal*
+    :vterm-terminal))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -108,6 +112,75 @@ Defaults to $SHELL.")
 (defmacro with-cmd-dir (dir &body body)
   (with-thunk (body)
     `(call/cmd-dir ,body ,dir)))
+
+(defvar *visual-commands* '()
+  "List of commands that should be run in a `*terminal*' emulator.
+Also see `*command-wrappers*'.")
+
+(defvar *command-wrappers* '("sudo" "env")
+  "Commands that fire up other commands.
+This list is used by `visual-command-p' to check if the wrapped command is a
+visual one.
+See `*visual-commands*'.")
+
+(defun visual-command-p (command)
+  "Return true if the COMMAND list runs one of the programs in `*visual-commands*'.
+`*command-wrappers*' are supported, i.e.
+
+  env FOO=BAR sudo -i powertop
+
+works."
+  (labels ((basename (arg)
+             (namestring (pathname-name arg)))
+           (flag? (arg)
+             (str:starts-with? "-" arg))
+           (variable? (arg)
+             (and (< 1 (length arg))
+                  (str:contains? "=" (subseq arg 1))))
+           (first-positional-argument (command)
+             "Return the argument that's not a flag, not a variable setting and
+not in `*command-wrappers*'."
+             (when command
+               (if (or (flag? (first command))
+                       (variable? (first command))
+                       (find (basename (first command))
+                             *command-wrappers*
+                             :test #'string=))
+                   (first-positional-argument (rest command))
+                   (first command)))))
+    (and-let* ((cmd (first-positional-argument command)))
+      (find (basename cmd)
+            *visual-commands*
+            :test #'string=))))
+
+(defun vterm-terminal (cmd)
+  "Run visual command CMD in Emacs' `vterm'."
+  (list
+   "emacsclient" "--eval"
+   (let ((*print-case* :downcase))
+     (write-to-string
+      `(progn
+         (vterm)
+         (vterm-insert ,(string-join cmd " "))
+         (vterm-send-return))))))
+
+(defvar *terminal* (cond
+                     ((resolve-executable "xterm")
+                      '("xterm" "-e"))
+                     ((resolve-executable "emacs")
+                       #'vterm-terminal))
+  "The terminal is either
+- a list of arguments after which the visual command is appended,
+- or a function of one argument, the list of commands, returning the new list of
+commands.
+See `*visual-commands*'.")
+
+(defun maybe-visual-command (cmd)
+  (if (visual-command-p cmd)
+      (if (functionp *terminal*)
+          (funcall *terminal* cmd)
+          (append *terminal* cmd))
+      cmd))
 
 (defmacro define-cmd-variant (name sh-name lambda-list &body body)
   (let ((docstring (and (stringp (car body)) (pop body))))
@@ -216,6 +289,7 @@ executable."
 (define-cmd-variant cmd& sh& (cmd &rest args)
   "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
+    (setf tokens (maybe-visual-command tokens))
     (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
     (setf args (expand-keyword-abbrevs args))
     (when *message-hook*
