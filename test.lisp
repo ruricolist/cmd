@@ -28,7 +28,7 @@
               ($cmd '("echo" #p "hello"))
               ($sh "echo hello")
               ($sh "echo 'hello'")
-              ($sh "echo \"hello")))
+              ($sh "echo \"hello\"")))
   (let ((file (asdf:system-relative-pathname :cmd "test/literal.txt")))
     (is (equal (chomp (read-file-into-string file))
                ($cmd "cat" file)))))
