@@ -133,10 +133,10 @@ works."
   (labels ((basename (arg)
              (namestring (pathname-name arg)))
            (flag? (arg)
-             (str:starts-with? "-" arg))
+             (string^= "-" arg))
            (variable? (arg)
              (and (< 1 (length arg))
-                  (str:contains? "=" (subseq arg 1))))
+                  (string*= "=" (subseq arg 1))))
            (first-positional-argument (command)
              "Return the argument that's not a flag, not a variable setting and
 not in `*command-wrappers*'."
