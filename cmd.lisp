@@ -314,7 +314,7 @@ executable."
              ;; old one to make sure keyword-override rules are
              ;; respected.
              (let* ((suffix (member :<<< args))
-                    (prefix (ldiff suffix args)))
+                    (prefix (ldiff args suffix)))
                (append prefix
                        (list :input in)
                        (cddr suffix)))))

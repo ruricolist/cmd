@@ -35,5 +35,7 @@
 
 (unix-test here-string
   (is (equal* ($cmd "bash -c" '("read x; echo \"$x\"") :<<< "hello")
+              ($cmd "bash -c" '("read x; echo \"$x\"; exit 1") :<<< "hello"
+                    :ignore-error-status t)
               ($sh "read x; echo \"$x\"" :<<< "hello")
               "hello")))
