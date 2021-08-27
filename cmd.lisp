@@ -233,7 +233,7 @@ defaults to the value of SHELL in the environment)."
     (values-list overrides)
     (values-list (cmd-kwargs cmd))))
 
-(-> $cmd (&rest t) string)
+(-> $cmd (&rest t) (values string &optional))
 (define-cmd-variant $cmd $sh (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell.
