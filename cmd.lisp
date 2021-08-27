@@ -368,6 +368,9 @@ executable."
        (rec xs (cons x args-out))))))
 
 (defun launch-pipeline (argv &rest args)
+  ;; TODO Need an equivalent to pipefail. Checking the process exit
+  ;; codes won't work; in a pipeline the exit status is apparently
+  ;; always 0.
   (destructuring-bind (&key input output error-output &allow-other-keys) args
     (let ((proc (multiple-value-call #'launch-program-in-dir*
                   argv
