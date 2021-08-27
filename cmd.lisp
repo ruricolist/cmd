@@ -323,7 +323,7 @@ executable."
         args
       (flet ((launch (args)
                (values
-                (multiple-value-call #'launch-program-with-redirects
+                (multiple-value-call #'launch-pipeline
                   tokens
                   (values-list args)
                   :output output
@@ -367,7 +367,7 @@ executable."
       ((list* x xs)
        (rec xs (cons x args-out))))))
 
-(defun launch-program-with-redirects (argv &rest args)
+(defun launch-pipeline (argv &rest args)
   (destructuring-bind (&key input output error-output &allow-other-keys) args
     (let ((proc (multiple-value-call #'launch-program-in-dir*
                   argv
@@ -434,10 +434,6 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
       ;; If non-unix, utilize the standard terminate process
       ;; which should be acceptable in most cases.
       (uiop:terminate-process process :urgent urgent)))
-
-(defun await-all (procs &rest args)
-  (do-each (proc (reshuffle procs))
-    (apply #'await proc args)))
 
 (defun await (proc &key ignore-error-status tokens)
   "Wait for PROC to finish."
