@@ -430,7 +430,8 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
             (if urgent 9 15)
             +ps+
             (process-info-pid process)
-            +tr+))
+            +tr+)
+       :ignore-error-status t)
       ;; If non-unix, utilize the standard terminate process
       ;; which should be acceptable in most cases.
       (uiop:terminate-process process :urgent urgent)))
