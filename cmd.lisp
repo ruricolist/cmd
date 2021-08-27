@@ -435,6 +435,8 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
       ;; which should be acceptable in most cases.
       (uiop:terminate-process process :urgent urgent)))
 
+(-> await (process-info &key (:ignore-error-status t) (:tokens list))
+  fixnum)
 (defun await (proc &key ignore-error-status tokens)
   "Wait for PROC to finish."
   (nest
@@ -447,7 +449,7 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
                       (finish-output err)))))
    (let ((abnormal? t)))
    (unwind-protect
-        (multiple-value-prog1
+        (prog1
             (let ((status (uiop:wait-process proc)))
               (cond ((zerop status)
                      status)
