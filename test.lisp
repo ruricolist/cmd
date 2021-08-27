@@ -39,3 +39,14 @@
                     :ignore-error-status t)
               ($sh "read x; echo \"$x\"" :<<< "hello")
               "hello")))
+
+(unix-test pipelines
+  (let ((string
+          (with-output-to-string (*standard-output*)
+            (nest
+             (cmd "cat" "/usr/share/dict/words" :>)
+             (cmdq "sort" :>)
+             (cmdq "uniq -c" :>)
+             (cmdq "sort -nr" :>)
+             (cmdq "head -3")))))
+    (is (length= 3 (lines string)))))

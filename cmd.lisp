@@ -2,6 +2,10 @@
   (:nicknames #:cmd)
   (:use #:cl #:alexandria #:serapeum #:cmd/hooks)
   (:import-from :uiop
+                :process-info-input
+                :process-info-error-output
+                :process-info-output
+                :process-info-pid
                 :pathname-equal
                 :getcwd
                 :os-unix-p
@@ -13,6 +17,8 @@
                 :directory-pathname-p)
   (:import-from :trivia :match)
   (:import-from :shlex)
+  (:import-from :uiop/launch-program
+                :process-info)
   (:export
     :cmd :$cmd :cmd? :cmd! :cmd&
     :sh :$sh :sh? :sh! :sh&
@@ -22,7 +28,8 @@
     :*visual-commands*
     :*command-wrappers*
     :*terminal*
-    :vterm-terminal))
+    :vterm-terminal
+    :cmdq))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -211,6 +218,21 @@ defaults to the value of SHELL in the environment)."
   (declare (function fn) (string cmd))
   (apply fn *shell* (shell-arg) (list cmd) kwargs))
 
+(defclass cmd ()
+  ((argv :initarg :argv :accessor cmd-argv)
+   (kwargs :initarg :kwargs :accessor cmd-kwargs)))
+
+(-> cmdq (&rest t) cmd)
+(define-cmd-variant cmdq shq (cmd &rest args)
+  (receive (argv kwargs) (parse-cmd-args (cons cmd args))
+    (make 'cmd :argv argv :kwargs kwargs)))
+
+(defun launch-cmd (cmd &rest overrides &key &allow-other-keys)
+  (multiple-value-call #'cmd&
+    (values-list (cmd-argv cmd))
+    (values-list overrides)
+    (values-list (cmd-kwargs cmd))))
+
 (-> $cmd (&rest t) string)
 (define-cmd-variant $cmd $sh (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
@@ -285,7 +307,7 @@ executable."
            :ignore-error-status (getf args :ignore-error-status)
            :tokens tokens)))
 
-(-> cmd& (&rest t) (values uiop/launch-program::process-info list list &optional))
+(-> cmd& (&rest t) (values process-info list list &optional))
 (define-cmd-variant cmd& sh& (cmd &rest args)
   "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
   (receive (tokens args) (parse-cmd-args (cons cmd args))
@@ -301,7 +323,7 @@ executable."
         args
       (flet ((launch (args)
                (values
-                (multiple-value-call #'launch-program-in-dir*
+                (multiple-value-call #'launch-program-with-redirects
                   tokens
                   (values-list args)
                   :output output
@@ -345,6 +367,31 @@ executable."
       ((list* x xs)
        (rec xs (cons x args-out))))))
 
+(defun launch-program-with-redirects (argv &rest args)
+  (destructuring-bind (&key input output error-output &allow-other-keys) args
+    (let ((proc (multiple-value-call #'launch-program-in-dir*
+                  argv
+                  (if (typep input 'cmd)
+                      (let ((subproc (launch-cmd input :output :stream)))
+                        (values :input (process-info-output subproc)))
+                      (values))
+                  (if (typep output 'cmd)
+                      (values :output :stream)
+                      (values))
+                  (if (typep error-output 'cmd)
+                      (values :error-output :stream)
+                      (values))
+                  (values-list args))))
+      (cond
+        ((and (typep output 'cmd)
+              (typep error-output 'cmd))
+         (error "Not implemented yet"))
+        ((typep output 'cmd)
+         (launch-cmd output :input (process-info-output proc)))
+        ((typep error-output 'cmd)
+         (launch-cmd error-output :input (process-info-error-output proc)))
+        (t proc)))))
+
 (defun launch-program-in-dir* (tokens &rest args)
   "Run a program (with uiop:run-program) in the current base directory."
   (let ((dir (stringify-pathname
@@ -382,17 +429,21 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
             +kill+
             (if urgent 9 15)
             +ps+
-            (uiop:process-info-pid process)
+            (process-info-pid process)
             +tr+))
       ;; If non-unix, utilize the standard terminate process
       ;; which should be acceptable in most cases.
       (uiop:terminate-process process :urgent urgent)))
 
+(defun await-all (procs &rest args)
+  (do-each (proc (reshuffle procs))
+    (apply #'await proc args)))
+
 (defun await (proc &key ignore-error-status tokens)
   "Wait for PROC to finish."
   (nest
-   (let ((out (uiop:process-info-output proc))
-         (err (uiop:process-info-error-output proc))))
+   (let ((out (process-info-output proc))
+         (err (process-info-error-output proc))))
    (handler-bind ((serious-condition
                     ;; Flush output on error.
                     (lambda (e) (declare (ignore e))
