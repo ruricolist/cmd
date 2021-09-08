@@ -15,7 +15,7 @@
                 :pathname-directory-pathname
                 :absolute-pathname-p
                 :directory-pathname-p)
-  (:import-from :trivia :match)
+  (:import-from :trivia :match :ematch)
   (:import-from :shlex)
   (:import-from :uiop/launch-program
                 :process-info)
@@ -94,8 +94,21 @@ Defaults to $SHELL.")
 (deftype subcommand-divider ()
   '#.(cons 'member +subcommand-dividers+))
 
+(defconstructor string-token
+  (string (simple-array character (*))))
+
+(defun make-string-token (string)
+  (string-token (coerce string '(simple-array character (*)))))
+
+(defun flatten-string-tokens (list)
+  (mapcar (lambda (item)
+            (if (typep item 'string-token)
+                (string-token-string item)
+                item))
+          list))
+
 (deftype token ()
-  '(or string subcommand-divider (cons keyword t)))
+  '(or subcommand-divider keyword string-token))
 
 (defun expand-redirection-abbrev (keyword)
   (assure list
@@ -235,15 +248,65 @@ defaults to the value of SHELL in the environment)."
   (apply fn *shell* (shell-arg) (list cmd) kwargs))
 
 (defclass cmd ()
-  ((argv :initarg :argv :accessor cmd-argv)
-   (kwargs :initarg :kwargs :accessor cmd-kwargs)))
+  ((argv :reader cmd-argv)
+   (kwargs :accessor cmd-kwargs))
+  (:documentation "A single subcommand, with argv and kwargs ready to
+  pass to `uiop:launch-program'."))
+
+(defmethod print-object ((self cmd) stream)
+  (print-unreadable-object (self stream :type t)
+    (with-slots (argv kwargs) self
+      (format stream "~a ~s" argv kwargs)))
+  self)
+
+(defmethod initialize-instance :after ((self cmd) &key
+                                                    ((:argv raw-argv) nil)
+                                                    ((:kwargs short-kwargs) nil))
+  (assert (evenp (length short-kwargs)))
+  (when (null raw-argv)
+    (error "No argv!"))
+  (setf raw-argv (flatten-string-tokens raw-argv))
+  (with-slots (argv kwargs) self
+    (setf argv
+          ;; NB UIOP expects simple-strings for arguments.
+          (mapcar (op (coerce _ '(simple-array character (*))))
+                  (maybe-visual-command
+                   (and raw-argv
+                        (cons (exe-string (car raw-argv))
+                              (cdr raw-argv)))))
+          kwargs (expand-keyword-abbrevs short-kwargs))))
+
+(defun parse-cmd (args)
+  (multiple-value-bind (argv kwargs) (argv+kwargs args)
+    (make 'cmd :argv argv :kwargs kwargs)))
+
+(defun split-pipeline (args)
+  "Split RAW-ARGS into two values: the last command in the pipeline, and any previous commands."
+  (let* ((args (parse-cmd-args args))
+         (tail args))
+    (loop for new-tail = (member :|\|| tail)
+          while new-tail
+          do (setf tail (rest new-tail)))
+    (values tail
+            (ldiff args tail))))
+
+(-> stage-pipeline (list) cmd)
+(defun stage-pipeline (cmds)
+  "Return CMDS as a single command that can be passed to `launch-pipeline'."
+  (reduce (lambda (outer inner)
+            (make 'cmd
+                  :argv (cmd-argv outer)
+                  :kwargs (list* :output inner (cmd-kwargs outer))))
+          cmds
+          :from-end t))
 
 (-> cmdq (&rest t) cmd)
 (define-cmd-variant cmdq shq (cmd &rest args)
-  (receive (argv kwargs) (parse-cmd-args (cons cmd args))
+  (receive (argv kwargs) (argv+kwargs (cons cmd args))
     (make 'cmd :argv argv :kwargs kwargs)))
 
 (defun launch-cmd (cmd &rest overrides &key &allow-other-keys)
+  "Auxiliary function for launching CMD with overrides."
   (multiple-value-call #'cmd&
     (values-list (cmd-argv cmd))
     (values-list overrides)
@@ -257,10 +320,13 @@ newlines, like $(cmd) would in a shell.
 By default stderr is discarded."
   (chomp
    (with-output-to-string (s)
-     (multiple-value-call #'cmd
-       :output s
-       cmd (values-list args)
-       :error-output nil))))
+     (multiple-value-bind (final subs)
+         (split-pipeline (cons cmd args))
+       (multiple-value-call #'cmd
+         (values-list subs)
+         :output s
+         (values-list final)
+         :error-output nil)))))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
 (define-cmd-variant cmd? sh? (cmd &rest args)
@@ -268,12 +334,14 @@ By default stderr is discarded."
 By default the output is discarded.
 
 Returns the actual exit code as a second value."
-  (let ((exit-code
-          (multiple-value-call #'cmd
-            :ignore-error-status t
-            cmd (values-list args)
-            :output nil
-            :error-output nil)))
+  (mvlet* ((final subs (split-pipeline (cons cmd args)))
+           (exit-code
+            (multiple-value-call #'cmd
+              (values-list subs)
+              :ignore-error-status t
+              (values-list final)
+              :output nil
+              :error-output nil)))
     (if (zerop exit-code)
         (values t 0)
         (values nil exit-code))))
@@ -281,10 +349,12 @@ Returns the actual exit code as a second value."
 (-> cmd! (&rest t) (values &optional))
 (define-cmd-variant cmd! sh! (cmd &rest args)
   "Run CMD purely for its side effects, discarding all output and returning nothing."
-  (apply #'cmd
-         :output nil
-         :error-output nil
-         cmd args)
+  (multiple-value-bind (final subs) (split-pipeline (cons cmd args))
+    (multiple-value-call #'cmd
+      (values-list subs)
+      :output nil
+      :error-output nil
+      (values-list final)))
   (values))
 
 (-> cmd (&rest t) (values integer &optional))
@@ -322,74 +392,76 @@ executable."
            :ignore-error-status (getf args :ignore-error-status)
            :tokens tokens)))
 
+(eval-always
+  (defun simplify-cmd-args (args)
+    "Simplify ARGS at compile time (for compiler macros)."
+    (nlet rec ((args-in args)
+               (args-out '()))
+      (match args-in
+        ((list)
+         (reverse args-out))
+        ((list (and _ (type keyword)))
+         (error "Dangling keyword argument to cmd."))
+        ((list* (and k (type subcommand-divider)) rest)
+         (rec rest
+              (cons k args-out)))
+        ((list* (and k (type keyword)) v rest)
+         (rec rest
+              (cons (if (constantp v)
+                        `'(,k ,v)
+                        `(list ,k ,v))
+                    args-out)))
+        ((list* (and s (type string)) xs)
+         (rec xs
+              (revappend (split-cmd s)
+                         args-out)))
+        ((list* (and p (type pathname)) xs)
+         (rec xs
+              (cons (make-string-token (stringify-pathname p))
+                    args-out)))
+        ((list* x xs)
+         (rec xs (cons x args-out)))))))
+
 (-> cmd& (&rest t) (values process-info list list &optional))
 (define-cmd-variant cmd& sh& (cmd &rest args)
   "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
-  (receive (tokens args) (parse-cmd-args (cons cmd args))
-    (setf tokens (maybe-visual-command tokens))
-    (setf tokens (cons (exe-string (car tokens)) (cdr tokens)))
-    (setf args (expand-keyword-abbrevs args))
+  (mvlet* ((final subs (split-pipeline (cons cmd args)))
+           (final (parse-cmd final))
+           (subs (mapcar #'cmdq (split-sequence :|\|| subs :remove-empty-subseqs t)))
+           (pipeline (append1 subs final)))
     (when *message-hook*
       (run-hook *message-hook*
-                (fmt "$ ~{~a~^ ~}" (mapcar #'shlex:quote tokens))))
-    (destructuring-bind (&key (output *standard-output*)
-                           (error-output *error-output*)
-                         &allow-other-keys)
-        args
-      (flet ((launch (args)
+                (fmt "$ ~{~{~a~^ ~}~^ | ~}"
+                     (mapcar (op (mapcar #'shlex:quote _))
+                             (mapcar #'cmd-argv pipeline)))))
+    (flet ((launch ()
+             (let* ((cmd (stage-pipeline pipeline))
+                    (argv (cmd-argv cmd))
+                    (kwargs (cmd-kwargs cmd)))
                (values
-                (multiple-value-call #'launch-pipeline
-                  tokens
-                  (values-list args)
-                  :output output
-                  :error-output error-output)
-                tokens args)))
-        (if-let (here-string (getf args :<<<))
-          (with-input-from-string (in here-string)
-            (launch
-             ;; Insert the new redirection in the same place as the
-             ;; old one to make sure keyword-override rules are
-             ;; respected.
-             (let* ((suffix (member :<<< args))
-                    (prefix (ldiff args suffix)))
-               (append prefix
-                       (list :input in)
-                       (cddr suffix)))))
-          (launch args))))))
-
-(defun simplify-cmd-args (args)
-  (nlet rec ((args-in args)
-             (args-out '()))
-    (match args-in
-      ((list)
-       (reverse args-out))
-      ((list (and _ (type keyword)))
-       (error "Dangling keyword argument to cmd."))
-      ((list* (and k (type subcommand-divider)) rest)
-       (rec rest
-            (cons k args-out)))
-      ((list* (and k (type keyword)) v rest)
-       (rec rest
-            (cons (if (constantp v)
-                      `'(,k ,v)
-                      `(list ,k ,v))
-                  args-out)))
-      ((list* (and s (type string)) xs)
-       (rec xs
-            (cons `(quote (,@(split-cmd s)))
-                  args-out)))
-      ((list* (and p (type pathname)) xs)
-       (rec xs
-            (cons (stringify-pathname p)
-                  args-out)))
-      ((list* x xs)
-       (rec xs (cons x args-out))))))
+                (apply #'launch-pipeline
+                       argv
+                       kwargs)
+                argv kwargs))))
+      (if-let (here-string (getf (cmd-kwargs final) :<<<))
+        (with-input-from-string (in here-string)
+          (symbol-macrolet ((args (cmd-kwargs final)))
+            (setf args
+                  (let* ((suffix (member :<<< args))
+                         (prefix (ldiff args suffix)))
+                    (append prefix
+                            (list :input in)
+                            (cddr suffix)))))
+          (launch))
+        (launch)))))
 
 (defun launch-pipeline (argv &rest args)
   ;; TODO Need an equivalent to pipefail. Checking the process exit
   ;; codes won't work; in a pipeline the exit status is apparently
   ;; always 0.
-  (destructuring-bind (&key input output error-output &allow-other-keys) args
+  (destructuring-bind (&key input
+                         (output *standard-output*) (error-output *error-output*)
+                       &allow-other-keys) args
     (let ((proc (multiple-value-call #'launch-program-in-dir*
                   argv
                   (if (typep input 'cmd)
@@ -402,7 +474,9 @@ executable."
                   (if (typep error-output 'cmd)
                       (values :error-output :stream)
                       (values))
-                  (values-list args))))
+                  (values-list args)
+                  :output output
+                  :error-output error-output)))
       (cond
         ((and (typep output 'cmd)
               (typep error-output 'cmd))
@@ -488,8 +562,7 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
      (when abnormal?
        (kill-process proc)))))
 
-(-> lex-cmd-args (list &key (:split boolean)) (values list &optional))
-(defun lex-cmd-args (args &key (split t))
+(defun parse-cmd-args (args &key (split t))
   "Lex ARGs.
 The result is a list of strings, subcommand dividers, and keyword
 arguments as individual conses (keyword . arg)."
@@ -497,27 +570,32 @@ arguments as individual conses (keyword . arg)."
              (acc '()))
     (match args
       ((list)
-       (assert (every (of-type 'token) acc))
        (nreverse acc))
+      ((list* (and arg (type string-token)) args)
+       (rec args
+            (cons arg acc)))
       ;; TODO We should also handle floats, but how to print
       ;; exponents? And what about fractions?
       ((list* (and arg (type integer)) args)
-       (rec (cons (princ-to-string arg)
-                  args)
-            acc))
+       (rec args
+            (cons (make-string-token (princ-to-string arg))
+                  acc)))
       ((list* (and arg (type character)) args)
-       (rec (cons (string arg) args) acc))
+       (rec args
+            (cons (make-string-token (string arg))
+                  acc)))
       ((list* (and arg (type string)) args)
        (rec args
             (if split
                 (revappend (split-cmd arg) acc)
-                (cons arg acc))))
+                (cons (make-string-token arg)
+                      acc))))
       ((list* (and arg (type pathname)) args)
        (rec args
             (cons (stringify-pathname arg) acc)))
       ((list* (and arg (type list)) args)
        (rec args
-            (revappend (lex-cmd-args arg :split nil)
+            (revappend (parse-cmd-args arg :split nil)
                        acc)))
       ((list (and _ (type keyword)))
        (error "Dangling keyword argument to cmd."))
@@ -526,35 +604,30 @@ arguments as individual conses (keyword . arg)."
       ((list* (and k (type subcommand-divider)) args)
        (rec args (cons k acc)))
       ((list* (and k (type keyword)) v args)
-       (rec args (cons (cons k v) acc)))
+       (rec args
+            (list* v k acc)))
       ((list* arg _)
        (error "Can't use ~a as a cmd argument." arg)))))
 
-(-> parse-lexed-args (list) (values list list &optional))
-(defun parse-lexed-args (args)
-  "Parse ARGS, the args for one command, into an argv and kwargs."
-  (nlet rec ((args args)
+(defun argv+kwargs (args)
+  "Parse ARGS and split them into an argv and keyword arguments."
+  (nlet rec ((args (parse-cmd-args args))
              (argv '())
              (kwargs '()))
-    (if (null args)
-        (values (nreverse argv)
-                (nreverse kwargs))
-        (destructuring-bind (arg . args) args
-          (etypecase-of token arg
-            (string
-             (rec args
-                  (cons arg argv)
-                  kwargs))
-            (subcommand-divider
-             (error "Subcommand divider in lexed args: ~a" args))
-            ((cons keyword t)
-             (rec args
-                  argv
-                  (list* (cdr arg) (car arg) kwargs))))))))
-
-(defun parse-cmd-args (args)
-  "Parse ARGS, the args for one command."
-  (parse-lexed-args (lex-cmd-args args)))
+    (ematch args
+      ((list)
+       (values (nreverse argv)
+               (nreverse kwargs)))
+      ((list* (and arg (type string-token)) args)
+       (rec args
+            (cons (string-token-string arg) argv)
+            kwargs))
+      ((list* (type subcommand-divider) _)
+       (error "Subcommand delimiter in cmd args: ~a" args))
+      ((list* (and k (type keyword)) v args)
+       (rec args
+            argv
+            (list* v k kwargs))))))
 
 (defun wrap-with-dir (dir tokens)
   "Wrap TOKENS with the necessary code to run the process in DIR.
@@ -599,13 +672,15 @@ process to change its own working directory."
   (unless (pathnamep arg)
     (return-from stringify-pathname arg))
   (lret ((string
-          (let ((string (native-namestring arg)))
-            (if (and (os-windows-p)
-                     (featurep :ccl)
-                     (position #\/ string))
-                ;; Work around a CCL bug; issue #103 on GitHub.
-                (substitute #\\ #\/ string)
-                string))))
+          (coerce
+           (let ((string (native-namestring arg)))
+             (if (and (os-windows-p)
+                      (featurep :ccl)
+                      (position #\/ string))
+                 ;; Work around a CCL bug; issue #103 on GitHub.
+                 (substitute #\\ #\/ string)
+                 string))
+           '(simple-array character (*)))))
     (when (string^= "-" string)
       ;; Should we ignore the unsafe file names if `--' or
       ;; `---' is already present in the list of tokens?
@@ -618,10 +693,9 @@ process to change its own working directory."
 
 (defun split-cmd (cmd)
   (mapcar (lambda (arg)
-            (or (find arg +redirection-operators+ :test #'string=)
-                (find arg +subcommand-dividers+ :test #'string=)
-                arg))
-          ;; NB UIOP expects simple-strings for arguments.
-          (mapcar (op (coerce _ '(simple-array character (*))))
-                  (shlex:split cmd :whitespace-split nil
-                                   :punctuation-chars t))))
+            (assure (or keyword string-token)
+              (or (find arg +redirection-operators+ :test #'string=)
+                  (find arg +subcommand-dividers+ :test #'string=)
+                  (make-string-token arg))))
+          (shlex:split cmd :whitespace-split nil
+                           :punctuation-chars t)))

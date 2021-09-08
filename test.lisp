@@ -1,7 +1,10 @@
 (uiop:define-package :cmd/test
   (:use :cl :cmd/cmd :fiveam :alexandria :serapeum)
-  (:import-from :cmd/cmd
-   :expand-keyword-abbrevs :split-cmd)
+  (:import-from
+   :cmd/cmd
+   :expand-keyword-abbrevs
+   :split-cmd
+   :flatten-string-tokens)
   (:import-from :uiop :os-unix-p)
   (:export :run-tests))
 (in-package :cmd/test)
@@ -43,15 +46,18 @@
               "hello")))
 
 (unix-test pipelines
-  (let ((string
+  (let ((string1
           (with-output-to-string (*standard-output*)
             (nest
              (cmd "cat" "/usr/share/dict/words" :>)
              (cmdq "sort" :>)
              (cmdq "uniq -c" :>)
              (cmdq "sort -nr" :>)
-             (cmdq "head -3")))))
-    (is (length= 3 (lines string)))))
+             (cmdq "head -3"))))
+        (string2
+          ($cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nr | head -3")))
+    (is (length= 3 (lines (chomp string1)) (lines string2)))
+    (is (equal (chomp string1) string2))))
 
 (test expand-keyword-abbrevs
   (is
@@ -61,5 +67,6 @@
       :error-output "bar.txt"))))
 
 (test split-cmd
-  (is (equal '("x" :> "y") (split-cmd "x > y")))
-  (is (equal '("x" :|\|| "y" :|\|| "z") (split-cmd "x | y | z"))))
+  (flet ((split-cmd (x) (flatten-string-tokens (split-cmd x))))
+    (is (equal '("x" :> "y") (split-cmd "x > y")))
+    (is (equal '("x" :|\|| "y" :|\|| "z") (split-cmd "x | y | z")))))
