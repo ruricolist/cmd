@@ -82,7 +82,7 @@ Defaults to $SHELL.")
 (uiop:register-image-restore-hook 'update-can-use-env-c)
 
 (defconst +redirection-operators+
-  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>&))
+  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<<))
 
 (defconst +subcommand-dividers+
   ;; TODO &&, ||, etc.
@@ -98,21 +98,23 @@ Defaults to $SHELL.")
   '(or string subcommand-divider (cons keyword t)))
 
 (defun expand-redirection-abbrev (keyword)
-  (case-of (or (eql :in) redirection-operator) keyword
-    (:in '(:directory _))
-    (:< '(:input _))
-    ((:> :1>) '(:output _))
-    ((:>> :1>>) '(:if-output-exists :append :output _))
-    (:|>\|| '(:if-output-exists :supersede :output _))
-    (:2> '(:error-output _))
-    (:2>> '(:if-error-output-exists :append :error-output _))
-    (:|2>\|| '(:if-error-output-exists :supersede :error-output _))
-    ((:&> :>&) '(:output _ :error-output _))
-    ((:&>> :>>&) '(:if-error-output-exists :append
-                   :if-output-exists :append
-                   :error-output _
-                   :output _))
-    (otherwise nil)))
+  (assure list
+    (case-of (or (eql :in) redirection-operator) keyword
+      (:in '(:directory _))
+      (:< '(:input _))
+      ((:> :1>) '(:output _))
+      ((:>> :1>>) '(:if-output-exists :append :output _))
+      (:|>\|| '(:if-output-exists :supersede :output _))
+      (:2> '(:error-output _))
+      (:2>> '(:if-error-output-exists :append :error-output _))
+      (:|2>\|| '(:if-error-output-exists :supersede :error-output _))
+      ((:&> :>&) '(:output _ :error-output _))
+      ((:&>> :>>&) '(:if-error-output-exists :append
+                     :if-output-exists :append
+                     :error-output _
+                     :output _))
+      (:<<< '(:<<< _))
+      (otherwise nil))))
 
 (def +dividers+ '(:|\||))
 
