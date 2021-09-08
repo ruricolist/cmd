@@ -46,6 +46,8 @@
               "hello")))
 
 (unix-test pipelines
+  (is (string= "oof" ($cmd "echo 'foo' | rev")))
+  (is (string= (fmt "rab~%oof") ($cmd "echo -e 'foo\\nbar' | rev | tac")))
   (let ((string1
           ($cmd "cat" "/usr/share/dict/words"
                 :pipeline "sort"
