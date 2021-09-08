@@ -50,7 +50,8 @@ Arguments are handled as follows:
 
 3. Keywords that are subcommand dividers (like `|`) are handled
    internally by `cmd`. Otherwise, a literal keyword, along with the
-   next value, is passed through as a keyword argument to UIOP.
+   next value, is passed through as a keyword argument to UIOP. (Note
+   that Cmd supports abbreviations for some UIOP keywords; see below.)
 
    ``` lisp
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
@@ -165,9 +166,7 @@ goodbye world
 
 ```
 
-Redirection with tokenized strings is usually more readable when the
-arguments are literals. Redirection with keyword arguments is usually
-more readable when the arguments are computed.
+Redirection with keyword arguments is usually more readable when the arguments are computed.
 
 Supported directions are:
 

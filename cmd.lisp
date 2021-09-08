@@ -280,7 +280,7 @@ defaults to the value of SHELL in the environment)."
     (make 'cmd :argv argv :kwargs kwargs)))
 
 (defun split-pipeline (args)
-  "Split RAW-ARGS into two values: the last command in the pipeline, and any previous commands."
+  "Split ARGS into two values: the last command in the pipeline, and any previous commands."
   (let* ((args (parse-cmd-args args))
          (tail args))
     (loop for new-tail = (member :|\|| tail)
@@ -564,7 +564,7 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
 (defun parse-cmd-args (args &key (split t))
   "Lex ARGs.
 The result is a list of strings, subcommand dividers, and keyword
-arguments as individual conses (keyword . arg)."
+arguments."
   (nlet rec ((args args)
              (acc '()))
     (match args
