@@ -180,7 +180,9 @@ Supported directions are:
 - `:&>>`, `:>>&` Append stdout and stderr.
 - `:<<<` Provide input from a “here string”.
 
-Note that redirections are interpreted according to the rules for Lisp keywords (only the first occurrence of a keyword argument matter), not the side-effecting rules for redirections in POSIX shells.
+Note that redirections are interpreted according to the rules for Lisp
+keywords (only the first occurrence of a keyword argument matters),
+not the side-effecting rules for redirections in POSIX shells.
 
 ### Pipelines
 
