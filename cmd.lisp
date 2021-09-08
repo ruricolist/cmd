@@ -211,16 +211,17 @@ See `*visual-commands*'.")
        (define-compiler-macro ,name (cmd &rest args)
          `(locally (declare (notinline ,',name))
             (,',name ,@(simplify-cmd-args (cons cmd args)))))
-       (defun ,sh-name (cmd &rest kwargs &key &allow-other-keys)
-         ,(fmt "Like `~(~a~)' for a shell command.
+       ,@(when sh-name
+           `((defun ,sh-name (cmd &rest kwargs &key &allow-other-keys)
+               ,(fmt "Like `~(~a~)' for a shell command.
 
 Takes a single argument (along with keyword arguments for redirection)
 and passes it to a shell.
 
 The shell defaults to the value of `cmd:*shell*' (which in turn
 defaults to the value of SHELL in the environment)."
-               name)
-         (apply #'as-shell #',name cmd kwargs)))))
+                     name)
+               (apply #'as-shell #',name cmd kwargs)))))))
 
 (defun shell-arg ()
   ;; NB Even Powershell supports -c.
@@ -314,8 +315,7 @@ output is sent to `*message-stream*'.
 
 On Windows, the .exe suffix may be omitted from the name of the
 executable."
-  (multiple-value-bind (proc tokens args)
-      (apply #'cmd& cmd args)
+  (receive (proc tokens args) (apply #'cmd& cmd args)
     (await proc
            :ignore-error-status (getf args :ignore-error-status)
            :tokens tokens)))
