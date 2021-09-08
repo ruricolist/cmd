@@ -81,7 +81,7 @@ Defaults to $SHELL.")
 (uiop:register-image-restore-hook 'update-can-use-env-c)
 
 (defconst +redirection-operators+
-  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<<))
+  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<< :>? :2>?))
 
 (defconst +subcommand-dividers+
   ;; TODO &&, ||, etc.
@@ -125,6 +125,8 @@ Defaults to $SHELL.")
                      :if-output-exists :append
                      :error-output _
                      :output _))
+      (:>? '(:if-output-exists :error :output _))
+      (:2>? '(:if-error-output-exists :error :error-output _))
       (:<<< '(:<<< _))
       (otherwise nil))))
 

@@ -168,7 +168,7 @@ goodbye world
 
 Redirection with keyword arguments is usually more readable when the arguments are computed.
 
-Supported directions are:
+Supported directions include:
 
 - `:<` Redirect stdin.
 - `:>`, `:1>` Redirect stdout.
