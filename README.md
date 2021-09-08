@@ -13,6 +13,8 @@ Cmd is designed to:
 
 Arguments to `cmd` are *never* passed to a shell for interpretation.
 
+Arguments can be either strings, keywords, or lists of strings and keywords.
+
 Arguments are handled as follows:
 
 1. A string is tokenized (using [cl-shlex][]) and added to the list of
@@ -26,6 +28,15 @@ Arguments are handled as follows:
    ≡ (uiop:run-program '("echo" "hello world"))
    ```
 
+   Redirection operators in the tokenized string (such as `<`, `>`, or
+   `|`) are translated into keywords (see below).
+
+   ```lisp
+   (cmd "echo 'hello world' > myfile")
+   ≡ (cmd '("echo" "hello world" :> "myfile"))
+   ≡ (uiop:run-program '("echo" "hello world") :output "myfile")
+   ```
+
 2. A list of strings is added directly to the list of arguments (not
    tokenized). (Putting a string in a list is “escaping” it.)
 
@@ -34,8 +45,12 @@ Arguments are handled as follows:
    ≡ (cmd "bash -c" '("exit 1"))
    ```
 
-3. A literal keyword, along with the next value, is passed through as
-   a keyword argument to UIOP.
+   Keywords in the list are treated exactly like keywords as
+   arguments.
+
+3. Keywords that are subcommand dividers (like `|`) are handled
+   internally by `cmd`. Otherwise, a literal keyword, along with the
+   next value, is passed through as a keyword argument to UIOP.
 
    ``` lisp
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
@@ -47,8 +62,9 @@ Arguments are handled as follows:
    Note that unlike normal Lisp functions, keyword arguments can
    appear anywhere, not just at the end.
 
-4. Any other string, integer, or pathname is directly added to the list
-   of arguments. (It is an error if a pathname begins with `-`.)
+4. Any character, integer, or pathname is directly added to the list
+   of arguments, as if it were a string. (It is an error if a pathname
+   begins with `-`.)
 
 ## The external program’s working directory
 
@@ -110,25 +126,48 @@ The `cmd` package offers several entry points:
 
 ## Redirection
 
-Redirection is accomplished via keyword arguments. These should be
-self-explanatory to anyone who has used a shell.
+Redirection is accomplished via either tokenized strings or keyword
+arguments. These should be self-explanatory to anyone who has used a
+shell.
 
 ``` lisp
-(cmd "echo 'hello world'" :> #p"hello.txt")
-(cmd "cat" #p"hello.txt")
+;;; Using keyword arguments.
+(cmd "echo 'hello world'" :> "hello.txt")
+(cmd "cat hello.txt")
 => hello world
 ;; Append
-(cmd "echo 'goodbye world'" :>> #p"hello.txt")
-(cmd "cat" #p"hello.txt")
+(cmd "echo 'goodbye world'" :>> "hello.txt")
+(cmd "cat hello.txt")
 => hello world
    goodbye world
-(cmd "tar cf -" #p"hello.txt" :> #p"hello.tar")
-(cmd "rm" #p"hello.txt")
-(cmd "tar xf" #p"hello.tar")
-(cmd "cat" #p"hello.txt")
+(cmd "tar cf - hello.txt" :> #p"hello.tar")
+(cmd "rm hello.txt")
+(cmd "tar xf hello.tar")
+(cmd "cat hello.txt")
 => hello world
-   goodbye world
+goodbye world
+
+;;; Using tokenized strings.
+(cmd "echo 'hello world' > hello.txt")
+(cmd "cat hello.txt")
+=> hello world
+;; Append
+(cmd "echo 'goodbye world' >> hello.txt")
+(cmd "cat hello.txt")
+=> hello world
+goodbye world
+(cmd "tar cf - hello.txt > hello.tar")
+(cmd "rm hello.txt")
+(cmd "tar xf hello.tar")
+(cmd "cat hello.txt")
+=> hello world
+goodbye world
+
 ```
+
+Redirection with tokenized strings is usually more readable when the
+arguments are literals. Redirection with keyword arguments is usually
+more readable when the arguments are computed.
 
 Supported directions are:
 
@@ -142,6 +181,32 @@ Supported directions are:
 - `:<<<` Provide input from a “here string”.
 
 Note that redirections are interpreted according to the rules for Lisp keywords (only the first occurrence of a keyword argument matter), not the side-effecting rules for redirections in POSIX shells.
+
+### Pipelines
+
+The simplest way to set up pipelines is to use tokenized strings:
+
+``` lisp
+(cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nr | head -3")
+=>    1 études
+      1 étude's
+      1 étude
+```
+
+Alternately you can use keywords. While `:|\||` is acceptable, you can write `:pipeline` instead:
+
+``` lisp
+(cmd "cat /usr/share/dict/words"
+     :pipeline "sort"
+     :pipeline "uniq -c"
+     :pipeline "sort -nr"
+     :pipeline "head -3")
+=>    1 études
+      1 étude's
+      1 étude
+```
+
+Again the keyword syntax is usually more readable when the subcommands are computed.
 
 ## Controlling cmd with hooks
 
