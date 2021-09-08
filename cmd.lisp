@@ -84,24 +84,35 @@ Defaults to $SHELL.")
 
 (uiop:register-image-restore-hook 'update-can-use-env-c)
 
-(def +keyword-abbrevs+
-  ;; >| would be |>\|| in Lisp syntax, not worth it.
-  ;; >? for Fish-style noclobber?
-  '((:in :directory _)
-    (:< :input _)
-    ((:> :1>) :output _)
-    ((:>> :1>>) :if-output-exists :append :output _)
-    (:|>\|| :if-output-exists :supersede :output _)
-    (:2> :error-output _)
-    (:2>> :if-error-output-exists :append :error-output _)
-    (:|2>\|| :if-error-output-exists :supersede :error-output _)
-    ((:&> :>&)
-     :output _ :error-output _)
-    ((:&>> :>>&)
-     :if-error-output-exists :append
-     :if-output-exists :append
-     :error-output _
-     :output _)))
+(defconst +redirection-operators+
+  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>&))
+
+(defconst +subcommand-dividers+
+  ;; TODO &&, ||, etc.
+  '(:|\||))
+
+(deftype redirection-operator ()
+  '#.(cons 'member +redirection-operators+))
+
+(deftype subcommand-divider ()
+  '#.(cons 'member +subcommand-dividers+))
+
+(defun expand-redirection-abbrev (keyword)
+  (case-of (or (eql :in) redirection-operator) keyword
+    (:in '(:directory _))
+    (:< '(:input _))
+    ((:> :1>) '(:output _))
+    ((:>> :1>>) '(:if-output-exists :append :output _))
+    (:|>\|| '(:if-output-exists :supersede :output _))
+    (:2> '(:error-output _))
+    (:2>> '(:if-error-output-exists :append :error-output _))
+    (:|2>\|| '(:if-error-output-exists :supersede :error-output _))
+    ((:&> :>&) '(:output _ :error-output _))
+    ((:&>> :>>&) '(:if-error-output-exists :append
+                   :if-output-exists :append
+                   :error-output _
+                   :output _))
+    (otherwise nil)))
 
 (def +dividers+ '(:|\||))
 
@@ -116,18 +127,13 @@ Defaults to $SHELL.")
         (let ((k (first args)))
           (if (not (keywordp k))
               (rec (rest args) (cons k exp))
-              (let ((k (or (assocdr k +divider-abbrevs+
-                                    :test #'member
-                                    :key #'ensure-list)
-                           k)))
-                (if (member k +dividers+)
+              (let ((k (if (eql k :pipeline) :|\|| k)))
+                (if (typep k 'subcommand-divider)
                     (rec (rest args) (cons k exp))
-                    (if-let (match (assoc k *keyword-abbrevs*
-                                          :test #'member
-                                          :key #'ensure-list))
+                    (if-let (match (expand-redirection-abbrev k))
                       (let ((v (second args)))
                         (rec (nthrest 2 args)
-                             (revappend (substitute v '_ (rest match))
+                             (revappend (substitute v '_ match)
                                         exp)))
                       (rec (nthrest 2 args)
                            (list* (second args) k exp))))))))))
