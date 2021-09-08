@@ -1,5 +1,7 @@
 (defpackage :cmd/test
   (:use :cl :cmd/cmd :fiveam :alexandria :serapeum)
+  (:import-from :cmd/cmd
+   :expand-keyword-abbrevs)
   (:import-from :uiop :os-unix-p)
   (:export :run-tests))
 (in-package :cmd/test)
@@ -50,3 +52,12 @@
              (cmdq "sort -nr" :>)
              (cmdq "head -3")))))
     (is (length= 3 (lines string)))))
+
+(test expand-keyword-abbrevs
+  (is
+   (equal
+    (expand-keyword-abbrevs '("foo" :|2>\|| "bar.txt" :pipeline "head" "-3"))
+    '("foo"
+      :if-error-output-exists :supersede
+      :error-output "bar.txt"
+      :|\|| "head" "-3"))))

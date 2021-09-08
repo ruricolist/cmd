@@ -84,15 +84,17 @@ Defaults to $SHELL.")
 
 (uiop:register-image-restore-hook 'update-can-use-env-c)
 
-(defparameter *keyword-abbrevs*
+(def +keyword-abbrevs+
   ;; >| would be |>\|| in Lisp syntax, not worth it.
   ;; >? for Fish-style noclobber?
   '((:in :directory _)
     (:< :input _)
     ((:> :1>) :output _)
     ((:>> :1>>) :if-output-exists :append :output _)
+    (:|>\|| :if-output-exists :supersede :output _)
     (:2> :error-output _)
     (:2>> :if-error-output-exists :append :error-output _)
+    (:|2>\|| :if-error-output-exists :supersede :error-output _)
     ((:&> :>&)
      :output _ :error-output _)
     ((:&>> :>>&)
@@ -101,14 +103,34 @@ Defaults to $SHELL.")
      :error-output _
      :output _)))
 
+(def +dividers+ '(:|\||))
+
+(def +divider-abbrevs+
+  '((:pipeline . :|\||)))
+
 (defun expand-keyword-abbrevs (args)
-  (collecting
-    (doplist (k v args)
-      (if-let (match (assoc k *keyword-abbrevs*
-                            :test #'member
-                            :key #'ensure-list))
-        (apply #'collect (substitute v '_ (rest match)))
-        (collect k v)))))
+  (nlet rec ((args args)
+             (exp nil))
+    (if (null args)
+        (nreverse exp)
+        (let ((k (first args)))
+          (if (not (keywordp k))
+              (rec (rest args) (cons k exp))
+              (let ((k (or (assocdr k +divider-abbrevs+
+                                    :test #'member
+                                    :key #'ensure-list)
+                           k)))
+                (if (member k +dividers+)
+                    (rec (rest args) (cons k exp))
+                    (if-let (match (assoc k *keyword-abbrevs*
+                                          :test #'member
+                                          :key #'ensure-list))
+                      (let ((v (second args)))
+                        (rec (nthrest 2 args)
+                             (revappend (substitute v '_ (rest match))
+                                        exp)))
+                      (rec (nthrest 2 args)
+                           (list* (second args) k exp))))))))))
 
 (defun call/cmd-dir (fn dir)
   (let* ((*default-pathname-defaults* dir)
