@@ -1,7 +1,7 @@
-(defpackage :cmd/test
+(uiop:define-package :cmd/test
   (:use :cl :cmd/cmd :fiveam :alexandria :serapeum)
   (:import-from :cmd/cmd
-   :expand-keyword-abbrevs)
+   :expand-keyword-abbrevs :split-cmd)
   (:import-from :uiop :os-unix-p)
   (:export :run-tests))
 (in-package :cmd/test)
@@ -56,8 +56,11 @@
 (test expand-keyword-abbrevs
   (is
    (equal
-    (expand-keyword-abbrevs '("foo" :|2>\|| "bar.txt" :pipeline "head" "-3"))
+    (expand-keyword-abbrevs '("foo" :|2>\|| "bar.txt"))
     '("foo"
       :if-error-output-exists :supersede
-      :error-output "bar.txt"
-      :|\|| "head" "-3"))))
+      :error-output "bar.txt"))))
+
+(test split-cmd
+  (is (equal '("x" :> "y") (split-cmd "x > y")))
+  (is (equal '("x" :|\|| "y" :|\|| "z") (split-cmd "x | y | z"))))

@@ -60,9 +60,6 @@ Defaults to $SHELL.")
               dir
               (pathname-directory-pathname dir))))))
 
-(deftype plist ()
-  '(or null (cons symbol list)))
-
 (defun can-use-env-c? ()
   (and (os-unix-p)
        (zerop
@@ -96,6 +93,9 @@ Defaults to $SHELL.")
 
 (deftype subcommand-divider ()
   '#.(cons 'member +subcommand-dividers+))
+
+(deftype token ()
+  '(or string subcommand-divider (cons keyword t)))
 
 (defun expand-redirection-abbrev (keyword)
   (case-of (or (eql :in) redirection-operator) keyword
@@ -492,49 +492,73 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
      (when abnormal?
        (kill-process proc)))))
 
-(defun parse-cmd-args (args)
+(-> lex-cmd-args (list &key (:split boolean)) (values list &optional))
+(defun lex-cmd-args (args &key (split t))
+  "Lex ARGs.
+The result is a list of strings, subcommand dividers, and keyword
+arguments as individual conses (keyword . arg)."
   (nlet rec ((args args)
-             (tokens '())
-             (plist '()))
+             (acc '()))
     (match args
       ((list)
-       (values (nreverse tokens)
-               (nreverse plist)))
+       (assert (every (of-type 'token) acc))
+       (nreverse acc))
+      ;; TODO We should also handle floats, but how to print
+      ;; exponents? And what about fractions?
       ((list* (and arg (type integer)) args)
        (rec (cons (princ-to-string arg)
                   args)
-            tokens
-            plist))
+            acc))
+      ((list* (and arg (type character)) args)
+       (rec (cons (string arg) args) acc))
       ((list* (and arg (type string)) args)
        (rec args
-            (nreconc (split-cmd arg) tokens)
-            plist))
+            (if split
+                (revappend (split-cmd arg) acc)
+                (cons arg acc))))
       ((list* (and arg (type pathname)) args)
        (rec args
-            (cons (stringify-pathname arg) tokens)
-            plist))
-      ((list* (and arg (type plist)) args)
+            (cons (stringify-pathname arg) acc)))
+      ((list* (and arg (type list)) args)
        (rec args
-            tokens
-            (revappend arg plist)))
-      ((list* (and arg (type sequence)) args)
-       (rec args
-            (nreconc
-             (collecting
-               (do-each (token arg)
-                 (collect (etypecase token
-                            (string token)
-                            (pathname (stringify-pathname token))))))
-             tokens)
-            plist))
+            (revappend (lex-cmd-args arg :split nil)
+                       acc)))
       ((list (and _ (type keyword)))
        (error "Dangling keyword argument to cmd."))
+      ((list* (and _ (eql :pipeline)) args)
+       (rec (cons :|\|| args) acc))
+      ((list* (and k (type subcommand-divider)) args)
+       (rec args (cons k acc)))
       ((list* (and k (type keyword)) v args)
-       (rec args
-            tokens
-            (nreconc (list k v) plist)))
+       (rec args (cons (cons k v) acc)))
       ((list* arg _)
        (error "Can't use ~a as a cmd argument." arg)))))
+
+(-> parse-lexed-args (list) (values list list &optional))
+(defun parse-lexed-args (args)
+  "Parse ARGS, the args for one command, into an argv and kwargs."
+  (nlet rec ((args args)
+             (argv '())
+             (kwargs '()))
+    (if (null args)
+        (values (nreverse argv)
+                (nreverse kwargs))
+        (destructuring-bind (arg . args) args
+          (etypecase-of token arg
+            (string
+             (rec args
+                  (cons arg argv)
+                  kwargs))
+            (subcommand-divider
+             (error "Subcommand divider in lexed args: ~a" args))
+            ((cons keyword t)
+             (rec args
+                  argv
+                  (list* (cdr arg) (car arg) kwargs))))))))
+
+(defun parse-cmd-args (args)
+  "Parse ARGS, the args for one command."
+  (parse-lexed-args (lex-cmd-args args)))
 
 (defun wrap-with-dir (dir tokens)
   "Wrap TOKENS with the necessary code to run the process in DIR.
@@ -597,7 +621,11 @@ process to change its own working directory."
   (stringify-pathname (exe p)))
 
 (defun split-cmd (cmd)
-  ;; NB UIOP expects simple-strings for arguments.
-  (mapcar (op (coerce _ '(simple-array character (*))))
-          (shlex:split cmd :whitespace-split nil
-                           :punctuation-chars t)))
+  (mapcar (lambda (arg)
+            (or (find arg +redirection-operators+ :test #'string=)
+                (find arg +subcommand-dividers+ :test #'string=)
+                arg))
+          ;; NB UIOP expects simple-strings for arguments.
+          (mapcar (op (coerce _ '(simple-array character (*))))
+                  (shlex:split cmd :whitespace-split nil
+                                   :punctuation-chars t))))
