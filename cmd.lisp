@@ -247,6 +247,7 @@ defaults to the value of SHELL in the environment)."
 
 (defclass cmd ()
   ((argv :reader cmd-argv)
+   ;; Currently mutable for the :<<< hack.
    (kwargs :accessor cmd-kwargs))
   (:documentation "A single subcommand, with argv and kwargs ready to
   pass to `uiop:launch-program'."))
