@@ -56,9 +56,8 @@
 (test expand-keyword-abbrevs
   (is
    (equal
-    (expand-keyword-abbrevs '("foo" :|2>\|| "bar.txt"))
-    '("foo"
-      :if-error-output-exists :supersede
+    (expand-keyword-abbrevs '(:|2>\|| "bar.txt"))
+    '(:if-error-output-exists :supersede
       :error-output "bar.txt"))))
 
 (test split-cmd
