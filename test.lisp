@@ -47,17 +47,17 @@
 
 (unix-test pipelines
   (let ((string1
-          (with-output-to-string (*standard-output*)
-            (nest
-             (cmd "cat" "/usr/share/dict/words" :>)
-             (cmdq "sort" :>)
-             (cmdq "uniq -c" :>)
-             (cmdq "sort -nr" :>)
-             (cmdq "head -3"))))
+          ($cmd "cat" "/usr/share/dict/words"
+                :pipeline "sort"
+                :pipeline "uniq -c"
+                :pipeline "sort -nr"
+                :pipeline "head -3"))
         (string2
           ($cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nr | head -3")))
-    (is (length= 3 (lines (chomp string1)) (lines string2)))
-    (is (equal (chomp string1) string2))))
+    (is (length= 3
+                 (lines string1)
+                 (lines string2)))
+    (is (equal string1 string2))))
 
 (test expand-keyword-abbrevs
   (is

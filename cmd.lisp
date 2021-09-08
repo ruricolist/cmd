@@ -28,8 +28,7 @@
     :*visual-commands*
     :*command-wrappers*
     :*terminal*
-    :vterm-terminal
-    :cmdq))
+    :vterm-terminal))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
