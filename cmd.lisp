@@ -667,6 +667,8 @@ process to change its own working directory."
              ;; Ampersand is the command separator.
              "&" ,command ,@args)))))
 
+(-> stringify-pathname ((or string pathname))
+    (simple-array character (*)))
 (defun stringify-pathname (arg)
   (unless (pathnamep arg)
     (return-from stringify-pathname arg))
