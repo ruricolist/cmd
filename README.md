@@ -231,7 +231,7 @@ Recent versions of GNU `env` support a `-C` switch to do this directly. When tha
 
 ## Past
 
-Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired by the `cmd` function in [Shake][], a Haskell build system.
+Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired by the `cmd` function in [Shake][], a Haskell build system, as well as the Julia language’s shell command facility.
 
 [UIOP]: https://common-lisp.net/project/asdf/uiop.html
 [Overlord]: https://github.com/ruricolist/overlord
