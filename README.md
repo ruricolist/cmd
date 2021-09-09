@@ -233,10 +233,6 @@ Recent versions of GNU `env` support a `-C` switch to do this directly. When tha
 
 Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired by the `cmd` function in [Shake][], a Haskell build system.
 
-## Future
-
-I plan to support at least inline redirection (e.g. `(cmd "sth file > other-file")`) and pipelines.
-
 [UIOP]: https://common-lisp.net/project/asdf/uiop.html
 [Overlord]: https://github.com/ruricolist/overlord
 [Shake]: https://shakebuild.com/
