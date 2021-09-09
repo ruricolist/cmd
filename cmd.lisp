@@ -1,4 +1,4 @@
-(defpackage #:cmd/cmd
+(uiop:define-package #:cmd/cmd
   (:nicknames #:cmd)
   (:use #:cl #:alexandria #:serapeum #:cmd/hooks)
   (:import-from :uiop
@@ -19,6 +19,8 @@
   (:import-from :shlex)
   (:import-from :uiop/launch-program
                 :process-info)
+  (:import-from #:trivial-garbage
+                #:make-weak-hash-table)
   (:export
     :cmd :$cmd :cmd? :cmd! :cmd&
     :sh :$sh :sh? :sh! :sh&
@@ -224,6 +226,36 @@ See `*visual-commands*'.")
           (funcall *terminal* cmd)
           (append *terminal* cmd))
       cmd))
+
+(defvar *subprocs*
+  (make-weak-hash-table :weakness :key)
+  "A table from process to subprocesses.")
+
+(defun subprocs (proc)
+  (synchronized ('*subprocs*)
+    (gethash proc *subprocs*)))
+
+(defun (setf subprocs) (value proc)
+  (synchronized ('*subprocs*)
+    (setf (gethash proc *subprocs*) value)))
+
+(defun register-subproc (proc subproc)
+  "Register SUBPROC as a subprocess of PROC and return SUBPROC."
+  (register-subprocs proc subproc)
+  (values))
+
+(defun register-subprocs (proc &rest subprocs)
+  "Register SUBPROC as a subprocess of PROC."
+  (synchronized ('*subprocs*)
+    (unionf (subprocs proc) subprocs)
+    (values)))
+
+(defun kill-subprocs (proc &key urgent)
+  "Kill all subprocesses of PROC."
+  (synchronized ('*subprocs*)
+    (dolist (subproc (subprocs proc))
+      (kill-subprocs subproc :urgent urgent)
+      (kill-process-group subproc :urgent urgent))))
 
 (defmacro define-cmd-variant (name sh-name lambda-list &body body)
   (let ((docstring (and (stringp (car body)) (pop body))))
@@ -467,29 +499,34 @@ executable."
   (destructuring-bind (&key input
                          (output *standard-output*) (error-output *error-output*)
                        &allow-other-keys) args
-    (let ((proc (multiple-value-call #'launch-program-in-dir*
-                  argv
-                  (if (typep input 'cmd)
-                      (let ((subproc (launch-cmd input :output :stream)))
-                        (values :input (process-info-output subproc)))
-                      (values))
-                  (if (typep output 'cmd)
-                      (values :output :stream)
-                      (values))
-                  (if (typep error-output 'cmd)
-                      (values :error-output :stream)
-                      (values))
-                  (values-list args)
-                  :output output
-                  :error-output error-output)))
+    (let* ((prev (and (typep input 'cmd)
+                      (launch-cmd input :output :stream)))
+           (proc (multiple-value-call #'launch-program-in-dir*
+                   argv
+                   (if prev
+                       (values :input (process-info-output prev))
+                       (values))
+                   (if (typep output 'cmd)
+                       (values :output :stream)
+                       (values))
+                   (if (typep error-output 'cmd)
+                       (values :error-output :stream)
+                       (values))
+                   (values-list args)
+                   :output output
+                   :error-output error-output)))
+      (when prev
+        (register-subproc proc prev))
       (cond
         ((and (typep output 'cmd)
               (typep error-output 'cmd))
          (error "Not implemented yet"))
         ((typep output 'cmd)
-         (launch-cmd output :input (process-info-output proc)))
+         (lret ((next (launch-cmd output :input (process-info-output proc))))
+           (register-subproc next proc)))
         ((typep error-output 'cmd)
-         (launch-cmd error-output :input (process-info-error-output proc)))
+         (lret ((enext (launch-cmd error-output :input (process-info-error-output proc))))
+           (register-subproc enext proc)))
         (t proc)))))
 
 (defun launch-program-in-dir* (tokens &rest args)
@@ -524,6 +561,7 @@ executable."
 (defun kill-process-group (process &key urgent)
   "Terminate PROCESS and all its descendants.
 On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
+  (kill-subprocs process :urgent urgent)
   (if (and (os-unix-p)
            ;; ECL doesn't start a new process group for
            ;; launch-program, so this would kill the Lisp process.
@@ -569,8 +607,10 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
                              :process proc)
                      status)))
           (setf abnormal? nil))
-     (when abnormal?
-       (kill-process-group proc)))))
+     (progn
+       (kill-subprocs proc)
+       (when abnormal?
+         (kill-process-group proc))))))
 
 (defun parse-cmd-args (args &key (split t))
   "Lex ARGs.

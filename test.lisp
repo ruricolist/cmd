@@ -86,3 +86,8 @@
 
 (unix-test tokenize-regression
   (is-true (cmd? "echo \"sleep 5000\" | grep -qo -e 'sleep 5000'")))
+
+(unix-test kill-pipeline
+  (let ((proc (cmd& "sleep 5000 | echo 'done'")))
+    (kill-process-group proc)
+    (is (null (cmd? "pidof sleep")))))
