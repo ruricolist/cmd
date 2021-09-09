@@ -49,7 +49,9 @@
 
 Defaults to $SHELL.")
 
+(-> current-dir () (values absolute-directory-pathname &optional))
 (defun current-dir ()
+  "Get the current directory based on `*default-pathname-defaults*'."
   (let ((dpd *default-pathname-defaults*))
     (if (typep dpd 'absolute-directory-pathname)
         dpd
@@ -59,6 +61,8 @@ Defaults to $SHELL.")
               (pathname-directory-pathname dir))))))
 
 (defun can-use-env-c? ()
+  "Return T if we can use env -C to launch a program in the current
+directory, instead of using a shell."
   (and (os-unix-p)
        (zerop
         (nth-value 2
@@ -72,7 +76,8 @@ Defaults to $SHELL.")
            :error-output nil)))))
 
 (defparameter *can-use-env-c*
-  (can-use-env-c?))
+  (can-use-env-c?)
+  "Save whether we can use env -C.")
 
 (defun update-can-use-env-c ()
   (setf *can-use-env-c* (can-use-env-c?)))
@@ -80,11 +85,13 @@ Defaults to $SHELL.")
 (uiop:register-image-restore-hook 'update-can-use-env-c)
 
 (defconst +redirection-operators+
-  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<< :>? :2>?))
+  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<< :>? :2>?)
+  "All redirection operators that can be parsed in tokenized strings.")
 
 (defconst +subcommand-dividers+
   ;; TODO &&, ||, etc.
-  '(:|\||))
+  '(:|\||)
+  "All supported subcommand dividers (e.g. pipelines).")
 
 (deftype redirection-operator ()
   '#.(cons 'member +redirection-operators+))
