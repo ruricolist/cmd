@@ -259,7 +259,7 @@ facility][backtick]. The `psub` function is inspired by the
 [cl-shlex]: https://github.com/ruricolist/cl-shlex
 [dpd]: http://clhs.lisp.se/Body/v_defaul.htm
 [Bernstein chaining]: http://www.catb.organization/~eser/writings/taoup/html/ch06s06.html
-[Julia]: TODO
-[backtick]: TODO
-[Fish shell]: TODO
-[psub]: TODO
+[Julia]: https://julialang.org
+[backtick]: https://julialang.org/blog/2013/04/put-this-in-your-pipe/
+[Fish shell]: https://fishshell.com
+[psub]: https://fishshell.com/docs/current/cmds/psub.html
