@@ -1,35 +1,38 @@
 (uiop:define-package #:cmd/cmd
   (:nicknames #:cmd)
   (:use #:cl #:alexandria #:serapeum #:cmd/hooks)
-  (:import-from :uiop
-                :process-info-input
-                :process-info-error-output
-                :process-info-output
-                :process-info-pid
-                :pathname-equal
-                :getcwd
-                :os-unix-p
-                :native-namestring
-                :native-namestring
-                :os-windows-p :file-exists-p :getenv
-                :pathname-directory-pathname
-                :absolute-pathname-p
-                :directory-pathname-p)
+  (:import-from
+   :uiop
+   :delete-file-if-exists
+   :process-info-input
+   :process-info-error-output
+   :process-info-output
+   :process-info-pid
+   :pathname-equal
+   :getcwd
+   :os-unix-p
+   :native-namestring
+   :native-namestring
+   :os-windows-p :file-exists-p :getenv
+   :pathname-directory-pathname
+   :absolute-pathname-p
+   :directory-pathname-p)
   (:import-from :trivia :match :ematch)
   (:import-from :shlex)
   (:import-from :uiop/launch-program
-                :process-info)
+   :process-info)
   (:import-from #:trivial-garbage
                 #:make-weak-hash-table)
   (:export
-    :cmd :$cmd :cmd? :cmd! :cmd&
-    :sh :$sh :sh? :sh! :sh&
-    :with-cmd-dir
-    :*shell*
-    :*visual-commands*
-    :*command-wrappers*
-    :*terminal*
-    :vterm-terminal))
+   :cmd :$cmd :cmd? :cmd! :cmd&
+   :sh :$sh :sh? :sh! :sh&
+   :with-cmd-dir
+   :psub
+   :*shell*
+   :*visual-commands*
+   :*command-wrappers*
+   :*terminal*
+   :vterm-terminal))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -236,6 +239,7 @@ See `*visual-commands*'.")
     (gethash proc *subprocs*)))
 
 (defun (setf subprocs) (value proc)
+  (check-type value list)
   (synchronized ('*subprocs*)
     (setf (gethash proc *subprocs*) value)))
 
@@ -254,8 +258,12 @@ See `*visual-commands*'.")
   "Kill all subprocesses of PROC."
   (synchronized ('*subprocs*)
     (dolist (subproc (subprocs proc))
-      (kill-subprocs subproc :urgent urgent)
-      (kill-process-group subproc :urgent urgent))))
+      (etypecase subproc
+        ;; Arbitrary cleanup.
+        (function (funcall subproc))
+        (process-info
+         (kill-subprocs subproc :urgent urgent)
+         (kill-process-group subproc :urgent urgent))))))
 
 (defmacro define-cmd-variant (name sh-name lambda-list &body body)
   (let ((docstring (and (stringp (car body)) (pop body))))
@@ -292,6 +300,13 @@ defaults to the value of SHELL in the environment)."
    (kwargs :accessor cmd-kwargs))
   (:documentation "A single subcommand, with argv and kwargs ready to
   pass to `uiop:launch-program'."))
+
+(defclass substitution (cmd)
+  ()
+  (:documentation "A command substitution."))
+
+(defclass psub (substitution) ()
+  (:documentation "A process substitution."))
 
 (defmethod print-object ((self cmd) stream)
   (print-unreadable-object (self stream :type t)
@@ -341,6 +356,28 @@ defaults to the value of SHELL in the environment)."
 (-> cmdq (&rest t) cmd)
 (define-cmd-variant cmdq shq (cmd &rest args)
   (parse-cmd (cons cmd args)))
+
+(-> psub (&rest t) psub)
+(define-cmd-variant psub psub-shell (cmd &rest args)
+  (multiple-value-bind (argv kwargs) (argv+kwargs (cons cmd args))
+    (make 'psub :argv argv :kwargs kwargs)))
+
+(defun mktemp ()
+  (stringify-pathname
+   (uiop:with-temporary-file (:pathname p :keep t :prefix "cmd")
+     p)))
+
+(defun launch-psubs (argv)
+  "Launch any process substitutions in ARGV. Return two values: the
+new argv and a list of subprocesses (or other cleanup forms)."
+  (with-collectors (new-argv cleanup)
+    (dolist (arg argv)
+      (if (typep arg 'psub)
+          (let ((temp (mktemp)))
+            (new-argv temp)
+            (cleanup (lambda () (delete-file-if-exists temp)))
+            (cleanup (launch-cmd arg :output temp :error-output nil)))
+          (new-argv arg)))))
 
 (defun launch-cmd (cmd &rest overrides &key &allow-other-keys)
   "Auxiliary function for launching CMD with overrides."
@@ -499,22 +536,24 @@ executable."
   (destructuring-bind (&key input
                          (output *standard-output*) (error-output *error-output*)
                        &allow-other-keys) args
-    (let* ((prev (and (typep input 'cmd)
-                      (launch-cmd input :output :stream)))
-           (proc (multiple-value-call #'launch-program-in-dir*
-                   argv
-                   (if prev
-                       (values :input (process-info-output prev))
-                       (values))
-                   (if (typep output 'cmd)
-                       (values :output :stream)
-                       (values))
-                   (if (typep error-output 'cmd)
-                       (values :error-output :stream)
-                       (values))
-                   (values-list args)
-                   :output output
-                   :error-output error-output)))
+    (mvlet* ((prev (and (typep input 'cmd)
+                        (launch-cmd input :output :stream)))
+             (argv psubs (launch-psubs argv))
+             (proc (multiple-value-call #'launch-program-in-dir*
+                     argv
+                     (if prev
+                         (values :input (process-info-output prev))
+                         (values))
+                     (if (typep output 'cmd)
+                         (values :output :stream)
+                         (values))
+                     (if (typep error-output 'cmd)
+                         (values :error-output :stream)
+                         (values))
+                     (values-list args)
+                     :output output
+                     :error-output error-output)))
+      (apply #'register-subprocs proc psubs)
       (when prev
         (register-subproc proc prev))
       (cond
@@ -621,7 +660,7 @@ arguments."
     (match args
       ((list)
        (nreverse acc))
-      ((list* (and arg (type string-token)) args)
+      ((list* (and arg (type (or string-token substitution))) args)
        (rec args
             (cons arg acc)))
       ;; TODO We should also handle floats, but how to print
@@ -668,7 +707,7 @@ arguments."
       ((list)
        (values (nreverse argv)
                (nreverse kwargs)))
-      ((list* (and arg (type string-token)) args)
+      ((list* (and arg (type (or string-token substitution))) args)
        (rec args
             (cons arg argv)
             kwargs))

@@ -91,3 +91,13 @@
   (let ((proc (cmd& "sleep 5000 | echo 'done'")))
     (kill-process-group proc)
     (is (null (cmd? "pidof sleep")))))
+
+(unix-test psub
+  (is-true (cmd? "diff" (psub "echo 'x'") (psub "echo 'x'")))
+  (is (equal "1c1"
+             (first
+              (lines
+               ($cmd "diff"
+                     :ignore-error-status t
+                     (psub "echo -e 'hello\nworld'")
+                     (psub "echo -e 'goodbye\nworld'")))))))

@@ -13,7 +13,8 @@ Cmd is designed to:
 
 Arguments to `cmd` are *never* passed to a shell for interpretation.
 
-Arguments can be either strings, keywords, or lists of strings and keywords.
+Arguments can be either strings, keywords, `psub` instances, or lists
+of strings, keywords, and `psub` instances.
 
 Arguments are handled as follows:
 
@@ -66,6 +67,18 @@ Arguments are handled as follows:
 4. Any character, integer, or pathname is directly added to the list
    of arguments, as if it were a string. (It is an error if a pathname
    begins with `-`.)
+
+5. Instances of `psub` are constructed by the `psub` function. This
+   supports a basic form of process substitution, running processes as
+   input to commands that expect files:
+
+   ``` lisp
+   (cmd? "diff" (psub "echo x") (psub "echo x"))
+   => T
+
+   (cmd? "diff" (psub "echo x") (psub "echo y"))
+   => NIL
+   ```
 
 ## The external program’s working directory
 
@@ -234,7 +247,11 @@ Recent versions of GNU `env` support a `-C` switch to do this directly. When tha
 
 ## Past
 
-Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired by the `cmd` function in [Shake][], a Haskell build system, as well as the Julia language’s shell command facility.
+Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was
+inspired by the `cmd` function in [Shake][], a Haskell build system,
+as well as the [Julia][] language’s [shell command
+facility][backtick]. The `psub` function is inspired by the
+[builtin][psub] of the same name in the [Fish shell][].
 
 [UIOP]: https://common-lisp.net/project/asdf/uiop.html
 [Overlord]: https://github.com/ruricolist/overlord
@@ -242,3 +259,7 @@ Cmd is a spinoff of [Overlord][], a Common Lisp build system, and was inspired b
 [cl-shlex]: https://github.com/ruricolist/cl-shlex
 [dpd]: http://clhs.lisp.se/Body/v_defaul.htm
 [Bernstein chaining]: http://www.catb.organization/~eser/writings/taoup/html/ch06s06.html
+[Julia]: TODO
+[backtick]: TODO
+[Fish shell]: TODO
+[psub]: TODO
