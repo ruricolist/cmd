@@ -4,7 +4,8 @@
    :cmd/cmd
    :expand-keyword-abbrevs
    :split-cmd
-   :flatten-string-tokens)
+   :flatten-string-tokens
+   :kill-process-group)
   (:import-from :uiop :os-unix-p :subprocess-error)
   (:export :run-tests))
 (in-package :cmd/test)

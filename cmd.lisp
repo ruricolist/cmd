@@ -514,7 +514,7 @@ executable."
 
 ;;; From https://GitHub.com/GrammaTech/cl-utils/blob/master/shell.lisp
 ;;; (MIT license).
-(defun kill-process (process &key urgent)
+(defun kill-process-group (process &key urgent)
   "Terminate PROCESS and all its descendants.
 On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
   (if (and (os-unix-p)
@@ -563,7 +563,7 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
                      status)))
           (setf abnormal? nil))
      (when abnormal?
-       (kill-process proc)))))
+       (kill-process-group proc)))))
 
 (defun parse-cmd-args (args &key (split t))
   "Lex ARGs.
