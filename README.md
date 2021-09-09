@@ -106,6 +106,9 @@ The `cmd` package offers several entry points:
   => "Sun Sep 27 15:43:01 CDT 2020"
   ```
 
+- `cmd!` runs an external program purely for side effects, discarding
+  all output and returning nothing.
+
 - `cmd?` returns `t` if the external program returned `0`, and `nil`
   otherwise, with the exit code as a second value. As other variants
   by default signal an error if the process exists non-zero, `cmd?` is
