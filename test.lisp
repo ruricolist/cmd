@@ -5,7 +5,7 @@
    :expand-keyword-abbrevs
    :split-cmd
    :flatten-string-tokens)
-  (:import-from :uiop :os-unix-p)
+  (:import-from :uiop :os-unix-p :subprocess-error)
   (:export :run-tests))
 (in-package :cmd/test)
 
@@ -72,3 +72,13 @@
   (flet ((split-cmd (x) (flatten-string-tokens (split-cmd x))))
     (is (equal '("x" :> "y") (split-cmd "x > y")))
     (is (equal '("x" :|\|| "y" :|\|| "z") (split-cmd "x | y | z")))))
+
+(unix-test pipefail
+  (let ((*standard-output* (make-broadcast-stream)))
+    (signals subprocess-error
+      (cmd "bash -c 'echo hello; exit 1'"))
+    ;; TODO This doesn't work on CCL or SBCL. The problem is that the
+    ;; exit code actually gets set to zero.
+    ;; (signals subprocess-error
+    ;;   (cmd "bash -c 'echo hello; exit 1' | rev"))
+    ))

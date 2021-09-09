@@ -457,8 +457,8 @@ executable."
 
 (defun launch-pipeline (argv &rest args)
   ;; TODO Need an equivalent to pipefail. Checking the process exit
-  ;; codes won't work; in a pipeline the exit status is apparently
-  ;; always 0.
+  ;; codes won't work; on SBCL at least, in a pipeline the exit status
+  ;; is apparently always 0.
   (destructuring-bind (&key input
                          (output *standard-output*) (error-output *error-output*)
                        &allow-other-keys) args
