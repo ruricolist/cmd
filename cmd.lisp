@@ -439,7 +439,7 @@ executable."
          (reverse args-out))
         ((list (and _ (type keyword)))
          (error "Dangling keyword argument to cmd."))
-        ((list* (and k (type subcommand-divider)) rest)
+        ((list* (and k (or :pipeline (type subcommand-divider))) rest)
          (rec rest
               (cons k args-out)))
         ((list* (and k (type keyword)) v rest)
