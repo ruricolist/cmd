@@ -82,3 +82,6 @@
     ;; (signals subprocess-error
     ;;   (cmd "bash -c 'echo hello; exit 1' | rev"))
     ))
+
+(unix-test tokenize-regression
+  (is-true (cmd? "echo \"sleep 5000\" | grep -qo -e 'sleep 5000'")))

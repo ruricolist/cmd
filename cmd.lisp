@@ -165,6 +165,7 @@ See `*visual-commands*'.")
   env FOO=BAR sudo -i powertop
 
 works."
+  (setf command (flatten-string-tokens command))
   (labels ((basename (arg)
              (namestring (pathname-name arg)))
            (flag? (arg)
@@ -265,15 +266,13 @@ defaults to the value of SHELL in the environment)."
   (assert (evenp (length short-kwargs)))
   (when (null raw-argv)
     (error "No argv!"))
-  (setf raw-argv (flatten-string-tokens raw-argv))
   (with-slots (argv kwargs) self
     (setf argv
           ;; NB UIOP expects simple-strings for arguments.
-          (mapcar (op (coerce _ '(simple-array character (*))))
-                  (maybe-visual-command
-                   (and raw-argv
-                        (cons (exe-string (car raw-argv))
-                              (cdr raw-argv)))))
+          (maybe-visual-command
+           (and raw-argv
+                (cons (exe-string (car raw-argv))
+                      (cdr raw-argv))))
           kwargs (expand-keyword-abbrevs short-kwargs))))
 
 (defun parse-cmd (args)
@@ -302,8 +301,7 @@ defaults to the value of SHELL in the environment)."
 
 (-> cmdq (&rest t) cmd)
 (define-cmd-variant cmdq shq (cmd &rest args)
-  (receive (argv kwargs) (argv+kwargs (cons cmd args))
-    (make 'cmd :argv argv :kwargs kwargs)))
+  (parse-cmd (cons cmd args)))
 
 (defun launch-cmd (cmd &rest overrides &key &allow-other-keys)
   "Auxiliary function for launching CMD with overrides."
@@ -504,10 +502,15 @@ executable."
            ;; calling `chdir', which is unacceptable.
            (wrap-with-dir dir tokens))
          (proc
-           (multiple-value-call #'uiop:launch-program cmd
-             (values-list args))))
+           (apply #'launch-program cmd args)))
     (run-hook *proc-hook* proc)
     proc))
+
+(defun launch-program (cmd &rest args)
+  "Like `uiop:launch-program', but unwrapping string tokens at the last possible moment."
+  (apply #'uiop:launch-program
+         (flatten-string-tokens cmd)
+         args))
 
 ;;; From https://GitHub.com/GrammaTech/cl-utils/blob/master/shell.lisp
 ;;; (MIT license).
@@ -620,7 +623,7 @@ arguments."
                (nreverse kwargs)))
       ((list* (and arg (type string-token)) args)
        (rec args
-            (cons (string-token-string arg) argv)
+            (cons arg argv)
             kwargs))
       ((list* (type subcommand-divider) _)
        (error "Subcommand delimiter in cmd args: ~a" args))
@@ -691,7 +694,12 @@ process to change its own working directory."
               string))))
 
 (defun exe-string (p)
-  (stringify-pathname (exe p)))
+  (etypecase p
+    ((or string pathname)
+     (stringify-pathname (exe p)))
+    (string-token
+     (make-string-token
+      (exe-string (string-token-string p))))))
 
 (defun split-cmd (cmd)
   (mapcar (lambda (arg)
