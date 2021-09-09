@@ -22,7 +22,6 @@
   (:export
     :cmd :$cmd :cmd? :cmd! :cmd&
     :sh :$sh :sh? :sh! :sh&
-    :pipeline                           ;Not yet implemented.
     :with-cmd-dir
     :*shell*
     :*visual-commands*
