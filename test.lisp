@@ -101,3 +101,6 @@
                      :ignore-error-status t
                      (psub "echo -e 'hello\nworld'")
                      (psub "echo -e 'goodbye\nworld'")))))))
+
+(unix-test stringify-regression
+  (finishes (cmd! :in "/tmp" "ls")))

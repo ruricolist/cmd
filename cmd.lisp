@@ -762,24 +762,24 @@ process to change its own working directory."
 (-> stringify-pathname ((or string pathname))
     (simple-array character (*)))
 (defun stringify-pathname (arg)
-  (unless (pathnamep arg)
-    (return-from stringify-pathname arg))
-  (lret ((string
-          (coerce
-           (let ((string (native-namestring arg)))
-             (if (and (os-windows-p)
-                      (featurep :ccl)
-                      (position #\/ string))
-                 ;; Work around a CCL bug; issue #103 on GitHub.
-                 (substitute #\\ #\/ string)
-                 string))
-           '(simple-array character (*)))))
-    (when (string^= "-" string)
-      ;; Should we ignore the unsafe file names if `--' or
-      ;; `---' is already present in the list of tokens?
-      (cerror "Allow the unsafe file name"
-              "File name ~a begins with a dash"
-              string))))
+  (etypecase arg
+    (string (coerce arg '(simple-array character (*))))
+    (pathname
+     (stringify-pathname
+      (lret ((string
+              (let ((string (native-namestring arg)))
+                (if (and (os-windows-p)
+                         (featurep :ccl)
+                         (position #\/ string))
+                    ;; Work around a CCL bug; issue #103 on GitHub.
+                    (substitute #\\ #\/ string)
+                    string))))
+        (when (string^= "-" string)
+          ;; Should we ignore the unsafe file names if `--' or
+          ;; `---' is already present in the list of tokens?
+          (cerror "Allow the unsafe file name"
+                  "File name ~a begins with a dash"
+                  string)))))))
 
 (defun exe-string (p)
   (etypecase p
