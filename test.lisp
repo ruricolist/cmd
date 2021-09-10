@@ -104,3 +104,10 @@
 
 (unix-test stringify-regression
   (finishes (cmd! :in "/tmp" "ls")))
+
+(unix-test output-file-regression
+  (let ((file (string+ "/tmp/cmd-hello-" (random 10000))))
+    ;; Bug only happens when file gets passed through as a string token.
+    (cmd (fmt "echo -n hello > ~a" file))
+    (is (equal "hello" (read-file-into-string file)))
+    (uiop:delete-file-if-exists file)))

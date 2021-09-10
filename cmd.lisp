@@ -536,13 +536,13 @@ executable."
                               (mapcar #'cmd-argv pipeline))))))
     (flet ((launch ()
              (let* ((cmd (stage-pipeline pipeline))
-                    (argv (cmd-argv cmd))
-                    (kwargs (cmd-kwargs cmd)))
+                    (argv (flatten-string-tokens (cmd-argv cmd)))
+                    (kwargs (flatten-string-tokens (cmd-kwargs cmd))))
                (values
                 (apply #'launch-pipeline
                        argv
                        kwargs)
-                (flatten-string-tokens argv)
+                argv
                 kwargs))))
       (if-let (here-string (getf (cmd-kwargs final) :<<<))
         (with-input-from-string (in here-string)
@@ -612,15 +612,9 @@ executable."
            ;; calling `chdir', which is unacceptable.
            (wrap-with-dir dir tokens))
          (proc
-           (apply #'launch-program cmd args)))
+           (apply #'uiop:launch-program cmd args)))
     (run-hook *proc-hook* proc)
     proc))
-
-(defun launch-program (cmd &rest args)
-  "Like `uiop:launch-program', but unwrapping string tokens at the last possible moment."
-  (apply #'uiop:launch-program
-         (flatten-string-tokens cmd)
-         args))
 
 ;;; From https://GitHub.com/GrammaTech/cl-utils/blob/master/shell.lisp
 ;;; (MIT license).
