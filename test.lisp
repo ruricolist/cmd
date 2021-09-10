@@ -111,3 +111,25 @@
     (cmd (fmt "echo -n hello > ~a" file))
     (is (equal "hello" (read-file-into-string file)))
     (uiop:delete-file-if-exists file)))
+
+(test with-working-directory
+  (let* ((tmp (uiop:temporary-directory))
+         (new-dir-name (string+ "cmd-test-dir-" (random 10000)))
+         (new-dir
+           (ensure-directories-exist
+            (uiop:ensure-directory-pathname
+             (path-join tmp new-dir-name)))))
+    (unwind-protect
+         (with-working-directory (new-dir)
+           (is (equal *default-pathname-defaults*
+                      (path-join tmp
+                                 (make-pathname
+                                  :directory `(:relative ,new-dir-name)))))
+           (let ((subdir
+                   (ensure-directories-exist
+                    (path-join new-dir
+                               (make-pathname
+                                :directory '(:relative "subdir"))))))
+             (with-working-directory ("subdir")
+               (equal *default-pathname-defaults* subdir))))
+      (uiop:delete-directory-tree new-dir :validate (constantly t)))))

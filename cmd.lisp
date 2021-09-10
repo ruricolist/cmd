@@ -29,6 +29,7 @@
    :cmd :$cmd :cmd? :cmd! :cmd&
    :sh :$sh :sh? :sh! :sh&
    :with-cmd-dir
+   :with-working-directory
    :psub
    :*shell*
    :*visual-commands*
@@ -62,10 +63,10 @@ Defaults to $SHELL.")
   (let ((dpd *default-pathname-defaults*))
     (if (typep dpd 'absolute-directory-pathname)
         dpd
-        (let ((dir (truename dpd)))
-          (if (typep dir 'directory-pathname)
-              dir
-              (pathname-directory-pathname dir))))))
+        (ensure-directory-pathname
+         (if (typep dpd 'absolute-pathname)
+             dpd
+             (uiop:merge-pathnames* dpd (uiop:getcwd)))))))
 
 (defun can-use-env-c? ()
   "Return T if we can use env -C to launch a program in the current
@@ -153,15 +154,24 @@ directory, instead of using a shell."
         (collect k v)))))
 
 (defun call/cmd-dir (fn dir)
-  (let* ((dir (uiop:ensure-pathname dir
-                                    :want-absolute t
-                                    :want-directory t))
+  (let* ((dir (pathname dir))
          (*default-pathname-defaults* dir)
          ;; Resolve based on the usual rules.
          (*default-pathname-defaults* (current-dir)))
     (funcall fn)))
 
+(defmacro with-working-directory ((dir) &body body)
+  "Run BODY with DIR as the current directory.
+Calls to `cmd' and its variants with the dynamic extent of the
+`with-working-directory' form will use `dir' as their working directory."
+  (with-thunk (body)
+    `(call/cmd-dir ,body ,dir)))
+
 (defmacro with-cmd-dir (dir &body body)
+  "Deprecated; use `with-working-directory' instead."
+  (simple-style-warning "~s is deprecated, please use ~s"
+                        'with-cmd-dir
+                        'with-working-directory)
   (with-thunk (body)
     `(call/cmd-dir ,body ,dir)))
 
