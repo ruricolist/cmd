@@ -507,7 +507,8 @@ executable."
       (run-hook *message-hook*
                 (fmt "$ ~{~{~a~^ ~}~^ | ~}"
                      (mapcar (op (mapcar #'shlex:quote _))
-                             (mapcar #'cmd-argv pipeline)))))
+                             (flatten-string-tokens
+                              (mapcar #'cmd-argv pipeline))))))
     (flet ((launch ()
              (let* ((cmd (stage-pipeline pipeline))
                     (argv (cmd-argv cmd))
