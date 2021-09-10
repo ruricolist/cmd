@@ -363,6 +363,13 @@ defaults to the value of SHELL in the environment)."
     (make 'psub :argv argv :kwargs kwargs)))
 
 (defun mktemp ()
+  "Create a temporary file for use with process substition.
+When possible use a tmpfs."
+  (let ((uiop:*temporary-directory*
+          (or (and (os-unix-p)
+                   (or (uiop:directory-exists-p #P"/run/shm")
+                       (uiop:directory-exists-p #P"/dev/shm")))
+              uiop:*temporary-directory*))))
   (uiop:with-temporary-file (:pathname p :keep t :prefix "cmd")
     p))
 
