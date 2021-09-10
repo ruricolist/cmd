@@ -208,26 +208,26 @@ not the side-effecting rules for redirections in POSIX shells.
 The simplest way to set up pipelines is to use tokenized strings:
 
 ``` lisp
-(cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nr | head -3")
-=>    1 études
-      1 étude's
-      1 étude
+(cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nrs | head -3")
+=>    1 a
+      1 A
+      1 Aachen
 ```
 
-Alternately you can use keywords. While `:|\||` is acceptable, you can write `:pipeline` instead:
+Alternately you can use keywords. While `:|\||` is acceptable, you can write `”|”` instead. (Remember `”|”` will be tokenized to `’(:|\||)`.)
 
 ``` lisp
 (cmd "cat /usr/share/dict/words"
-     :pipeline "sort"
-     :pipeline "uniq -c"
-     :pipeline "sort -nr"
-     :pipeline "head -3")
+     "|" '("sort")
+     "|" '("uniq" "-c")
+     "|" '("sort" "-nr")
+     "|" '("head" "-3"))
 =>    1 études
       1 étude's
       1 étude
 ```
 
-Again the keyword syntax is usually more readable when the subcommands are computed.
+Again, separating out the pipeline symbols is usually more readable when the subcommands are computed.
 
 ## Controlling cmd with hooks
 

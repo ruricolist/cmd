@@ -50,13 +50,13 @@
   (is (string= "oof" ($cmd "echo 'foo' | rev")))
   (is (string= (fmt "rab~%oof") ($cmd "echo -e 'foo\\nbar' | rev | tac")))
   (let ((string1
-          ($cmd "cat" "/usr/share/dict/words"
-                :pipeline "sort"
-                :pipeline "uniq -c"
-                :pipeline "sort -nr"
-                :pipeline "head -3"))
+          ($cmd "cat /usr/share/dict/words"
+               "|" '("sort")
+               "|" '("uniq" "-c")
+               "|" '("sort" "-nrs")
+               "|" '("head" "-3")))
         (string2
-          ($cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nr | head -3")))
+          ($cmd "cat /usr/share/dict/words | sort | uniq -c | sort -nrs | head -3")))
     (is (length= 3
                  (lines string1)
                  (lines string2)))
