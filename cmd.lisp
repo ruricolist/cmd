@@ -129,8 +129,10 @@ directory, instead of using a shell."
                 item))
           list))
 
-(deftype token ()
-  '(or subcommand-divider keyword string-token))
+(deftype parseable ()
+  '(or keyword string list
+    string-token substitution subcommand-divider
+    integer character pathname))
 
 (defun expand-redirection-abbrev (keyword)
   (assure list
@@ -517,23 +519,33 @@ executable."
          (reverse args-out))
         ((list (and _ (type keyword)))
          (error "Dangling keyword argument to cmd."))
-        ((list* (and k (type subcommand-divider)) rest)
-         (rec rest
-              (cons k args-out)))
         ((list* (and k (type keyword)) v rest)
          (rec rest
               (cons (if (constantp v)
                         `'(,k ,v)
                         `(list ,k ,v))
                     args-out)))
-        ((list* (and s (type string)) xs)
-         (rec xs
-              (revappend (split-cmd s)
-                         args-out)))
-        ((list* (and p (type pathname)) xs)
-         (rec xs
-              (cons (make-string-token (stringify-pathname p))
-                    args-out)))
+        ((list* (and x (type parseable)) xs)
+         (etypecase-of parseable x
+           (string
+            (rec xs
+                 (revappend (split-cmd x)
+                            args-out)))
+           (pathname
+            (rec xs
+                 (cons (make-string-token (stringify-pathname x))
+                       args-out)))
+           (integer
+            (rec xs
+                 (cons (make-string-token (princ-to-string x))
+                       args-out)))
+           (character
+            (rec xs
+                 (cons (make-string-token (string x))
+                       args-out)))
+           ((or subcommand-divider keyword list
+                string-token substitution)
+            (rec xs (cons x args-out)))))
         ((list* x xs)
          (rec xs (cons x args-out)))))))
 
@@ -697,39 +709,39 @@ arguments."
     (match args
       ((list)
        (nreverse acc))
-      ((list* (and arg (type (or string-token substitution))) args)
-       (rec args
-            (cons arg acc)))
-      ;; TODO We should also handle floats, but how to print
-      ;; exponents? And what about fractions?
-      ((list* (and arg (type integer)) args)
-       (rec args
-            (cons (make-string-token (princ-to-string arg))
-                  acc)))
-      ((list* (and arg (type character)) args)
-       (rec args
-            (cons (make-string-token (string arg))
-                  acc)))
-      ((list* (and arg (type string)) args)
-       (rec args
-            (if split
-                (revappend (split-cmd arg) acc)
-                (cons (make-string-token arg)
-                      acc))))
-      ((list* (and arg (type pathname)) args)
-       (rec args
-            (cons (stringify-pathname arg) acc)))
-      ((list* (and arg (type list)) args)
-       (rec args
-            (revappend (parse-cmd-args arg :split nil)
-                       acc)))
       ((list (and _ (type keyword)))
        (error "Dangling keyword argument to cmd."))
       ((list* (and k (type subcommand-divider)) args)
        (rec args (cons k acc)))
       ((list* (and k (type keyword)) v args)
-       (rec args
-            (list* v k acc)))
+       (rec args (list* v k acc)))
+      ((list* (and arg (type parseable)) args)
+       (etypecase-of parseable arg
+         ((or string-token substitution keyword subcommand-divider)
+          (rec args (cons arg acc)))
+         ;; TODO We should also handle floats, but how to print
+         ;; exponents? And what about fractions?
+         (integer
+          (rec args
+               (cons (make-string-token (princ-to-string arg))
+                     acc)))
+         (character
+          (rec args
+               (cons (make-string-token (string arg))
+                     acc)))
+         (string
+          (rec args
+               (if split
+                   (revappend (split-cmd arg) acc)
+                   (cons (make-string-token arg)
+                         acc))))
+         (pathname
+          (rec args
+               (cons (stringify-pathname arg) acc)))
+         (list
+          (rec args
+               (revappend (parse-cmd-args arg :split nil)
+                          acc)))))
       ((list* arg _)
        (error "Can't use ~a as a cmd argument." arg)))))
 
