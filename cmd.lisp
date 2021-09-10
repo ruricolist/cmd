@@ -363,9 +363,8 @@ defaults to the value of SHELL in the environment)."
     (make 'psub :argv argv :kwargs kwargs)))
 
 (defun mktemp ()
-  (stringify-pathname
-   (uiop:with-temporary-file (:pathname p :keep t :prefix "cmd")
-     p)))
+  (uiop:with-temporary-file (:pathname p :keep t :prefix "cmd")
+    p))
 
 (defun launch-psubs (argv)
   "Launch any process substitutions in ARGV. Return two values: the
@@ -374,7 +373,7 @@ new argv and a list of subprocesses (or other cleanup forms)."
     (dolist (arg argv)
       (if (typep arg 'psub)
           (let ((temp (mktemp)))
-            (new-argv temp)
+            (new-argv (stringify-pathname temp))
             (cleanup (lambda () (delete-file-if-exists temp)))
             (cleanup (launch-cmd arg :output temp :error-output nil)))
           (new-argv arg)))))
