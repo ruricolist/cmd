@@ -114,7 +114,7 @@
 
 (test with-working-directory
   (let* ((tmp (uiop:temporary-directory))
-         (new-dir-name (string+ "cmd-test-dir-" (random 10000)))
+         (new-dir-name (string+ "cmd-test-dir-" (random 10000) ".foo"))
          (new-dir
            (ensure-directories-exist
             (uiop:ensure-directory-pathname
@@ -129,7 +129,27 @@
                    (ensure-directories-exist
                     (path-join new-dir
                                (make-pathname
-                                :directory '(:relative "subdir"))))))
-             (with-working-directory ("subdir")
+                                :directory '(:relative "subdir.foo"))))))
+             (with-working-directory ("subdir.foo")
                (equal *default-pathname-defaults* subdir))))
-      (uiop:delete-directory-tree new-dir :validate (constantly t)))))
+      (uiop:delete-directory-tree
+       new-dir :validate (op (string*= ".foo" (namestring _)))))))
+
+(unix-test dont-parse-keyword-value-as-arg
+  (with-working-directory ((uiop:temporary-directory))
+    (let ((subdir (string+ "temp-" (random 10000) ".foo")))
+      (cmd "mkdir" subdir)
+      (unwind-protect
+           (with-working-directory (subdir)
+             (let* ((x (string+ "x-" (random 10000) ".foo"))
+                    (y (string+ "y-" (random 10000) ".foo"))
+                    (string (string+ x " " y)))
+               (cmd "echo hello" :> string)
+               (is (uiop:file-exists-p string))
+               (is (not (uiop:file-exists-p x)))
+               (is (not (string*= y (read-file-into-string string))))))
+        (uiop:delete-directory-tree
+         (path-join (uiop:temporary-directory)
+                    (make-pathname
+                     :directory `(:relative ,subdir)))
+         :validate (op (string*= ".foo" (namestring _))))))))
