@@ -153,3 +153,22 @@
                     (make-pathname
                      :directory `(:relative ,subdir)))
          :validate (op (string*= ".foo" (namestring _))))))))
+
+(unix-test do-parse-keywordlike-string-value-as-arg
+  (with-working-directory ((uiop:temporary-directory))
+    (let ((subdir (string+ "temp-" (random 10000) ".foo")))
+      (cmd "mkdir" subdir)
+      (unwind-protect
+           (with-working-directory (subdir)
+             (let* ((x (string+ "x-" (random 10000) ".foo"))
+                    (y (string+ "y-" (random 10000) ".foo"))
+                    (string (string+ x " " y)))
+               (cmd "echo hello" ">" string)
+               (is (not (uiop:file-exists-p string)))
+               (is (uiop:file-exists-p x))
+               (is (string*= y (read-file-into-string x)))))
+        (uiop:delete-directory-tree
+         (path-join (uiop:temporary-directory)
+                    (make-pathname
+                     :directory `(:relative ,subdir)))
+         :validate (op (string*= ".foo" (namestring _))))))))

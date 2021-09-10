@@ -528,9 +528,17 @@ executable."
         ((list* (and x (type parseable)) xs)
          (etypecase-of parseable x
            (string
-            (rec xs
-                 (revappend (split-cmd x)
-                            args-out)))
+            (let ((tokens (split-cmd x)))
+              (rec xs
+                   ;; A subtlety: an argument after a literal keyword
+                   ;; (that is not a subcommand divider) is not
+                   ;; parsed, but an argument after a string that
+                   ;; parses as a keyword is itself parsed. To
+                   ;; preserve that behavior we can't expand at
+                   ;; runtime if the last token is a keyword.
+                   (if (typep (lastcar tokens) 'keyword)
+                       (cons x args-out)
+                       (revappend tokens args-out)))))
            (pathname
             (rec xs
                  (cons (make-string-token (stringify-pathname x))
