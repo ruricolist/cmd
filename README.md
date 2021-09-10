@@ -13,8 +13,12 @@ Cmd is designed to:
 
 Arguments to `cmd` are *never* passed to a shell for interpretation.
 
-Arguments can be either strings, keywords, `psub` instances, or lists
-of strings, keywords, and `psub` instances.
+Arguments are usually:
+- strings
+- keywords
+- lists of strings and keywords
+
+Some other types get special handling. Nested lists are not allowed.
 
 Arguments are handled as follows:
 
@@ -38,8 +42,8 @@ Arguments are handled as follows:
    ≡ (uiop:run-program '("echo" "hello world") :output "myfile")
    ```
 
-2. A list of strings is added directly to the list of arguments (not
-   tokenized). (Putting a string in a list is “escaping” it.)
+2. A list is added directly to the list of arguments (not tokenized).
+   (Putting a string in a list is “escaping” it.)
 
    ``` lisp
    (cmd "bash -c 'exit 1'")
@@ -50,9 +54,8 @@ Arguments are handled as follows:
    arguments.
 
 3. Keywords that are subcommand dividers (like `|`) are handled
-   internally by `cmd`. Otherwise, a literal keyword, along with the
-   next value, is passed through as a keyword argument to UIOP. (Note
-   that Cmd supports abbreviations for some UIOP keywords; see below.)
+   internally by `cmd`. Otherwise, a keyword, along with the next
+   value, is used as a keyword arguments to UIOP.
 
    ``` lisp
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
@@ -68,9 +71,9 @@ Arguments are handled as follows:
    of arguments, as if it were a string. (It is an error if a pathname
    begins with `-`.)
 
-5. Instances of `psub` are constructed by the `psub` function. This
-   supports a basic form of process substitution, running processes as
-   input to commands that expect files:
+5. Cmd supports a basic form of process substitution, running
+   processes as input to commands that expect files. To construct a
+   process substitution, use the `psub` Lisp function.
 
    ``` lisp
    (cmd? "diff" (psub "echo x") (psub "echo x"))
@@ -120,7 +123,8 @@ The `cmd` package offers several entry points:
   ```
 
 - `cmd!` runs an external program purely for side effects, discarding
-  all output and returning nothing.
+  all output and returning nothing. If the program exits non-zero,
+  however, it will still signal an error.
 
 - `cmd?` returns `t` if the external program returned `0`, and `nil`
   otherwise, with the exit code as a second value. As other variants
@@ -235,7 +239,7 @@ The hook `*proc-hook*` is called with the process object (as returned by `uiop:l
 
 ## Windows
 
-On Windows only, the first argument (the program name) has .exe appended to it automatically if it doesn’t already have a file extension.
+On Windows only, the first argument (the program name) has `.exe` appended to it automatically if it doesn’t already have a file extension.
 
 ## Efficiency
 
@@ -252,6 +256,15 @@ inspired by the `cmd` function in [Shake][], a Haskell build system,
 as well as the [Julia][] language’s [shell command
 facility][backtick]. The `psub` function is inspired by the
 [builtin][psub] of the same name in the [Fish shell][].
+
+## Future
+
+- Pipelines should have “pipefail” behavior.
+- Pipelines should support stderr as well (`2|`, `&|`).
+- Efferent process substitution should also be supported.
+- There should be a special variable holding an alist of extra
+  environment variables to set when running a command. (The problem
+  here is Windows.)
 
 [UIOP]: https://common-lisp.net/project/asdf/uiop.html
 [Overlord]: https://github.com/ruricolist/overlord
