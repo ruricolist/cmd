@@ -516,7 +516,8 @@ executable."
                 (apply #'launch-pipeline
                        argv
                        kwargs)
-                argv kwargs))))
+                (flatten-string-tokens argv)
+                kwargs))))
       (if-let (here-string (getf (cmd-kwargs final) :<<<))
         (with-input-from-string (in here-string)
           (symbol-macrolet ((args (cmd-kwargs final)))
