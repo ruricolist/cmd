@@ -374,7 +374,7 @@ defaults to the value of SHELL in the environment)."
   (when (os-unix-p)
     (or (let ((dir (getenv "XDG_RUNTIME_DIR")))
           (unless (emptyp dir)
-            dir))
+            (ensure-directory-pathname dir)))
         (or (directory-exists-p
              (make-pathname
               :directory `(:absolute
