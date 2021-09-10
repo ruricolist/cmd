@@ -153,7 +153,10 @@ directory, instead of using a shell."
         (collect k v)))))
 
 (defun call/cmd-dir (fn dir)
-  (let* ((*default-pathname-defaults* dir)
+  (let* ((dir (uiop:ensure-pathname dir
+                                    :want-absolute t
+                                    :want-directory t))
+         (*default-pathname-defaults* dir)
          ;; Resolve based on the usual rules.
          (*default-pathname-defaults* (current-dir)))
     (funcall fn)))
