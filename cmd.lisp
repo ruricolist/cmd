@@ -16,7 +16,9 @@
    :os-windows-p :file-exists-p :getenv
    :pathname-directory-pathname
    :absolute-pathname-p
-   :directory-pathname-p)
+   :directory-pathname-p
+   :ensure-directory-pathname
+   :directory-exists-p)
   (:import-from :trivia :match :ematch)
   (:import-from :shlex)
   (:import-from :uiop/launch-program
@@ -362,16 +364,30 @@ defaults to the value of SHELL in the environment)."
   (multiple-value-bind (argv kwargs) (argv+kwargs (cons cmd args))
     (make 'psub :argv argv :kwargs kwargs)))
 
+(-> get-tmpfs ()
+  (values (or null absolute-directory-pathname) &optional))
+(defun get-tmpfs ()
+  "Get a suitable tmpfs."
+  (when (os-unix-p)
+    (or (let ((dir (getenv "XDG_RUNTIME_DIR")))
+          (unless (emptyp dir)
+            dir))
+        (or (directory-exists-p
+             (make-pathname
+              :directory `(:absolute
+                           "run"
+                           "user"
+                           ,($cmd "id -u"))))
+            (directory-exists-p #P"/run/shm")
+            (directory-exists-p #P"/dev/shm")))))
+
 (defun mktemp ()
   "Create a temporary file for use with process substition.
 When possible use a tmpfs."
   (let ((uiop:*temporary-directory*
-          (or (and (os-unix-p)
-                   (or (uiop:directory-exists-p #P"/run/shm")
-                       (uiop:directory-exists-p #P"/dev/shm")))
-              uiop:*temporary-directory*))))
-  (uiop:with-temporary-file (:pathname p :keep t :prefix "cmd")
-    p))
+          (or (get-tmpfs) uiop:*temporary-directory*)))
+    (uiop:with-temporary-file (:pathname p :keep t :prefix "cmd")
+      p)))
 
 (defun launch-psubs (argv)
   "Launch any process substitutions in ARGV. Return two values: the
