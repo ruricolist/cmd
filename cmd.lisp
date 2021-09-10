@@ -57,16 +57,25 @@
 
 Defaults to $SHELL.")
 
+(-> resolve-dir ((or string pathname))
+  (values absolute-directory-pathname &optional))
+(defun resolve-dir (dir)
+  "Resolve DIR into an absolute directory based on
+`*default-pathname-defaults*`, supplemented with the OS-level working
+directory if that is not absolute."
+  (let ((dir (ensure-directory-pathname dir)))
+    (if (typep dir 'absolute-pathname) dir
+        (ensure-directory-pathname
+         (if (typep *default-pathname-defaults* 'absolute-pathname)
+             (path-join *default-pathname-defaults* dir)
+             (path-join (uiop:getcwd)
+                        *default-pathname-defaults*
+                        dir))))))
+
 (-> current-dir () (values absolute-directory-pathname &optional))
 (defun current-dir ()
   "Get the current directory based on `*default-pathname-defaults*'."
-  (let ((dpd *default-pathname-defaults*))
-    (if (typep dpd 'absolute-directory-pathname)
-        dpd
-        (ensure-directory-pathname
-         (if (typep dpd 'absolute-pathname)
-             dpd
-             (uiop:merge-pathnames* dpd (uiop:getcwd)))))))
+  (resolve-dir *default-pathname-defaults*))
 
 (defun can-use-env-c? ()
   "Return T if we can use env -C to launch a program in the current
@@ -154,10 +163,7 @@ directory, instead of using a shell."
         (collect k v)))))
 
 (defun call/cmd-dir (fn dir)
-  (let* ((dir (pathname dir))
-         (*default-pathname-defaults* dir)
-         ;; Resolve based on the usual rules.
-         (*default-pathname-defaults* (current-dir)))
+  (let* ((*default-pathname-defaults* (resolve-dir dir)))
     (funcall fn)))
 
 (defmacro with-working-directory ((dir) &body body)
