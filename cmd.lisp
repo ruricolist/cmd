@@ -658,6 +658,7 @@ executable."
 (defun kill-process-group (process &key urgent)
   "Terminate PROCESS and all its descendants.
 On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
+  (uiop:close-streams process)
   (kill-subprocs process :urgent urgent)
   (if (and (os-unix-p)
            ;; ECL doesn't start a new process group for
@@ -705,7 +706,7 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
                      status)))
           (setf abnormal? nil))
      (progn
-       (kill-subprocs proc)
+       (uiop:close-streams proc)
        (when abnormal?
          (kill-process-group proc))))))
 
