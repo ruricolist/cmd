@@ -55,7 +55,7 @@ Arguments are handled as follows:
 
 3. Keywords that are subcommand dividers (like `|`) are handled
    internally by `cmd`. Otherwise, a keyword, along with the next
-   value, is used as a keyword arguments to UIOP.
+   value, is used as a keyword argument to UIOP.
 
    ``` lisp
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
@@ -68,8 +68,8 @@ Arguments are handled as follows:
    appear anywhere, not just at the end.
 
 4. Any character, integer, or pathname is directly added to the list
-   of arguments, as if it were a string. (It is an error if a pathname
-   begins with `-`.)
+   of arguments, as if it were an escaped string. (It is an error if a
+   pathname begins with `-`.)
 
 5. Cmd supports a basic form of process substitution, running
    processes as input to commands that expect files. To construct a
@@ -99,6 +99,17 @@ keyword argument `:in`:
 (cmd "ls" :in #p"/")
 (cmd :in #p"/" "ls")
 => /bin /home /tmp /usr ...
+```
+
+For convenience Cmd supplies the macro `with-working-directory`:
+
+``` lisp
+(with-working-directory (dir)
+  (cmd ...)
+  (cmd ...))
+≡ (progn
+    (cmd :in dir ...)
+    (cmd :in dir ...))
 ```
 
 ## Entry points
@@ -214,17 +225,17 @@ The simplest way to set up pipelines is to use tokenized strings:
       1 Aachen
 ```
 
-Alternately you can use keywords. While `:|\||` is acceptable, you can write `”|”` instead. (Remember `”|”` will be tokenized to `’(:|\||)`.)
+Alternately you can use keywords. While `:|\||` is acceptable, you can write `"|"` instead. (Remember `"|"` will be tokenized to `'(:|\||)`.)
 
 ``` lisp
 (cmd "cat /usr/share/dict/words"
      "|" '("sort")
      "|" '("uniq" "-c")
-     "|" '("sort" "-nr")
+     "|" '("sort" "-nrs")
      "|" '("head" "-3"))
-=>    1 études
-      1 étude's
-      1 étude
+=>    1 a
+      1 A
+      1 Aachen
 ```
 
 Again, separating out the pipeline symbols is usually more readable when the subcommands are computed.
