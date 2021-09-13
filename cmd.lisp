@@ -286,7 +286,8 @@ See `*visual-commands*'.")
         (function (funcall subproc))
         (process-info
          (kill-subprocs subproc :urgent urgent)
-         (kill-process-group subproc :urgent urgent))))))
+         (kill-process-group subproc :urgent urgent))))
+    (remhash proc *subprocs*)))
 
 (defmacro define-cmd-variant (name sh-name lambda-list &body body)
   (let ((docstring (and (stringp (car body)) (pop body))))
