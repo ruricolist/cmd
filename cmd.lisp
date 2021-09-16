@@ -232,7 +232,7 @@ not in `*command-wrappers*'."
      (write-to-string
       `(progn
          (vterm)
-         (vterm-insert ,(string-join cmd " "))
+         (vterm-insert ,(string-join (flatten-string-tokens cmd) " "))
          (vterm-send-return))))))
 
 (defvar *terminal* (cond
