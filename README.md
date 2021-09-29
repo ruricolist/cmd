@@ -112,6 +112,20 @@ For convenience Cmd supplies the macro `with-working-directory`:
     (cmd :in dir ...))
 ```
 
+## The external program’s environment
+
+For Unix users only, the variable `*cmd-env*` holds an alist of extra
+environment variables to set for each call to `cmd`.
+
+``` lisp
+
+(let ((*cmd-env* (acons "GIT_PAGER" "cat" *cmd-env*)))
+  (cmd "git diff" ...))
+```
+
+We are currently very restrictive about what we consider a valid
+environment variable name.
+
 ## Entry points
 
 The `cmd` package offers several entry points:

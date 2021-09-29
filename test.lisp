@@ -1,11 +1,13 @@
 (uiop:define-package :cmd/test
   (:use :cl :cmd/cmd :fiveam :alexandria :serapeum)
+  ;; Internal symbols.
   (:import-from
-   :cmd/cmd
-   :expand-keyword-abbrevs
-   :split-cmd
-   :flatten-string-tokens
-   :kill-process-group)
+    :cmd/cmd
+    :expand-keyword-abbrevs
+    :split-cmd
+    :flatten-string-tokens
+    :kill-process-group
+    :wrap-cmd-env)
   (:import-from :uiop :os-unix-p :subprocess-error)
   (:export :run-tests))
 (in-package :cmd/test)
@@ -171,3 +173,22 @@
                     (make-pathname
                      :directory `(:relative ,subdir)))
          :validate (op (string*= ".foo" (namestring _))))))))
+
+(test wrap-cmd-env
+  (is (equal '("hello")
+             (let ((*cmd-env* '()))
+               (wrap-cmd-env '("hello")))))
+  (is (equal '("env" "GIT_PAGER=cat" "hello")
+             (let ((*cmd-env* '(("GIT_PAGER" . "cat"))))
+               (wrap-cmd-env '("hello"))))))
+
+(unix-test cmd-env-no-escape
+  (is (equal "foo=bar"
+             (let* ((var-name (gensym))
+                    (*cmd-env* `((,var-name . "foo=bar"))))
+               ($cmd (fmt "sh -c 'echo $~a'" var-name))))))
+
+(unix-test cmd-env-valid-name
+  (signals error
+    (let* ((*cmd-env* `(("invalid=name" . "foo=bar"))))
+      ($cmd (fmt "sh -c 'echo ${invalid-name}'")))))

@@ -35,7 +35,8 @@
    :*visual-commands*
    :*command-wrappers*
    :*terminal*
-   :vterm-terminal))
+   :vterm-terminal
+   :*cmd-env*))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -56,6 +57,41 @@
   "The shell to use for shell commands.
 
 Defaults to $SHELL.")
+
+(declaim (type list *cmd-env*))
+(defvar *cmd-env* '()
+  "Alist of extra environment variables.")
+
+(defun wrap-cmd-env (cmd &aux (env *cmd-env*))
+  (if (null env) cmd
+      (if (not (os-unix-p))
+          (progn
+            (cerror "Run without the extra environment variables"
+                    "Cannot use ~s, not on Unix."
+                    '*cmd-env*)
+            cmd)
+          `("env" ,@(loop for (k . v) in env
+                          collect (fmt "~a=~a"
+                                       (validate-env-var k)
+                                       v))
+                  ,@cmd))))
+
+(-> validate-env-var (string-designator) string)
+(defun validate-env-var (name)
+  "Check that NAME is a valid (portable) name for an environment
+variable."
+  (let ((name (string name)))
+    (if (and (every (lambda (char)
+                      (or (eql char #\_)
+                          (digit-char-p char 10)
+                          (and (alpha-char-p char)
+                               (ascii-char-p char))
+                          (find char "!%,@")))
+                    name)
+             (or (emptyp name)
+                 (not (digit-char-p (aref name 0) 10))))
+        name
+        (error "Bad name for an environment variable: ~a" name))))
 
 (-> resolve-dir ((or string pathname))
   (values absolute-directory-pathname &optional))
@@ -645,9 +681,10 @@ executable."
                               &key
                               &allow-other-keys)
   (let* ((cmd
-           ;; NB The :directory argument to launch-program may end up
-           ;; calling `chdir', which is unacceptable.
-           (wrap-with-dir dir tokens))
+           (wrap-cmd-env
+            ;; NB The :directory argument to launch-program may end up
+            ;; calling `chdir', which is unacceptable.
+            (wrap-with-dir dir tokens)))
          (proc
            (apply #'uiop:launch-program cmd args)))
     (run-hook *proc-hook* proc)
