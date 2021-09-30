@@ -70,7 +70,7 @@ Defaults to $SHELL.")
                     "Cannot use ~s, not on Unix."
                     '*cmd-env*)
             cmd)
-          `("env" ,@(loop for (k . v) in env
+          `(,+env+ ,@(loop for (k . v) in env
                           collect (fmt "~a=~a"
                                        (validate-env-var k)
                                        v))
