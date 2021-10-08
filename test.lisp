@@ -7,7 +7,8 @@
     :split-cmd
     :flatten-string-tokens
     :kill-process-group
-    :wrap-cmd-env)
+    :wrap-cmd-env
+    :vterm-terminal)
   (:import-from :uiop :os-unix-p :subprocess-error)
   (:export :run-tests))
 (in-package :cmd/test)
@@ -192,3 +193,8 @@
   (signals error
     (let* ((*cmd-env* `(("invalid=name" . "foo=bar"))))
       ($cmd (fmt "sh -c 'echo ${invalid-name}'")))))
+
+(test vterm-cmd-package
+  (let ((*package* (find-package :keyword)))
+    (is (some (op (search "(vterm)" _))
+              (vterm-terminal '())))))

@@ -264,12 +264,13 @@ not in `*command-wrappers*'."
   "Run visual command CMD in Emacs' `vterm'."
   (list
    "emacsclient" "--eval"
-   (let ((*print-case* :downcase))
+   (let ((*package* (find-package :cmd/cmd)))
      (write-to-string
       `(progn
          (vterm)
          (vterm-insert ,(string-join (flatten-string-tokens cmd) " "))
-         (vterm-send-return))))))
+         (vterm-send-return))
+      :case :downcase))))
 
 (defvar *terminal* (cond
                      ((resolve-executable "xterm")
