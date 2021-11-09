@@ -126,6 +126,21 @@ environment variables to set for each call to `cmd`.
 We are currently very restrictive about what we consider a valid
 environment variable name.
 
+### Controlling PATH
+
+For controlling the `PATH` environment variable, the Lisp variable
+`*cmd-path*` can be used:
+
+``` lisp
+(let ((*cmd-path* (cons #p"~/.local/bin" *cmd-path*)))
+   ...)
+```
+
+Directories in `*cmd-path*` are prepended to `PATH`.
+
+This uses the same mechanism as `*cmd-env*`, so it also only works on
+Unix.
+
 ## Entry points
 
 The `cmd` package offers several entry points:

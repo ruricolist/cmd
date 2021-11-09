@@ -36,7 +36,8 @@
    :*command-wrappers*
    :*terminal*
    :vterm-terminal
-   :*cmd-env*))
+   :*cmd-env*
+   :*cmd-path*))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -58,11 +59,34 @@
 
 Defaults to $SHELL.")
 
-(declaim (type list *cmd-env*))
+(declaim (type (soft-list-of cons) *cmd-env*))
 (defvar *cmd-env* '()
   "Alist of extra environment variables.")
 
-(defun wrap-cmd-env (cmd &aux (env *cmd-env*))
+(declaim (type (soft-list-of (or pathname string)) *cmd-path*))
+(defvar *cmd-path* '()
+  "Extra directories to check for executables.")
+
+(defun cmd-env (&aux (env *cmd-env*) (path-list *cmd-path*))
+  (assert (every #'absolute-pathname-p path-list))
+  (let* ((old-path-list
+           (split-sequence #\: (uiop:getenv "PATH")))
+         (new-path-list
+           (mapcar #'native-namestring path-list))
+         (path-env
+           (and new-path-list
+                (not (subsetp new-path-list
+                              old-path-list
+                              :test #'equal))
+                (cons "PATH"
+                      (fmt "~{~a~^:~}"
+                           (nub (append new-path-list old-path-list)))))))
+    (declare (type (soft-list-of string) old-path-list new-path-list))
+    (if path-env
+        (cons path-env env)
+        env)))
+
+(defun wrap-cmd-env (cmd &aux (env (cmd-env)))
   (if (null env) cmd
       (if (not (os-unix-p))
           (progn
@@ -71,10 +95,10 @@ Defaults to $SHELL.")
                     '*cmd-env*)
             cmd)
           `(,+env+ ,@(loop for (k . v) in env
-                          collect (fmt "~a=~a"
-                                       (validate-env-var k)
-                                       v))
-                  ,@cmd))))
+                           collect (fmt "~a=~a"
+                                        (validate-env-var k)
+                                        v))
+                   ,@cmd))))
 
 (-> validate-env-var (string-designator) string)
 (defun validate-env-var (name)
@@ -427,6 +451,7 @@ defaults to the value of SHELL in the environment)."
   (values (or null absolute-directory-pathname) &optional))
 (defun get-tmpfs ()
   "Get a suitable tmpfs."
+  (declare (notinline $cmd))            ;Bootstrapping.
   (when (os-unix-p)
     (or (let ((dir (getenv "XDG_RUNTIME_DIR")))
           (unless (emptyp dir)
