@@ -31,6 +31,8 @@
    :with-cmd-dir
    :with-working-directory
    :psub
+   :psub-echo
+   :psub-format
    :*shell*
    :*visual-commands*
    :*command-wrappers*
@@ -386,11 +388,59 @@ defaults to the value of SHELL in the environment)."
   (:documentation "A single subcommand, with argv and kwargs ready to
   pass to `uiop:launch-program'."))
 
-(defclass substitution (cmd)
+(defclass substitution ()
   ()
   (:documentation "A command substitution."))
 
-(defclass psub (substitution) ()
+(defgeneric launch-substitution (sub)
+  (:documentation "Launch a command substitution.
+Should always return two values, both lists:
+1. A list of new arguments for the argv.
+2. A list of cleanup forms."))
+
+(defclass psub-echo (substitution)
+  ((string :initarg :string :reader psub-echo-string :type string))
+  (:documentation "A process substitution that just echoes a string.")
+  (:default-initargs
+   :string (error "No string!")))
+
+(defun psub-echo (string)
+  "Allow passing STRING to a command that expects a file.
+This is practically equivalent to
+
+    (psub \"echo\" (list string))
+
+Except that it doesn't actually launch an external program."
+  (check-type string string)
+  (make 'psub-echo :string string))
+
+(defun psub-format (control-string &rest args)
+  "Format ARGS using CONTROL-STRING and pass the result as a file to
+the enclosing command.
+
+This is practically equivalent to
+
+    (psub \"echo\" (list (format nil \"?\" control-string args))
+
+Except that it doesn't actually launch an external program."
+  (declare (dynamic-extent args))
+  (psub-echo (fmt "~?" control-string args)))
+
+(define-compiler-macro psub-format (&whole call control-string &rest args)
+  (if (stringp control-string)
+      `(psub-format (formatter ,control-string) ,@args)
+      call))
+
+(defmethod launch-substitution ((sub psub-echo))
+  (let ((temp (mktemp)))
+    (write-string-into-file (psub-echo-string sub)
+                            temp
+                            :if-exists :rename
+                            :if-does-not-exist :create)
+    (values (list (stringify-pathname temp))
+            (list (lambda () (delete-file-if-exists temp))))))
+
+(defclass psub (substitution cmd) ()
   (:documentation "A process substitution."))
 
 (defmethod print-object ((self cmd) stream)
@@ -414,8 +464,15 @@ defaults to the value of SHELL in the environment)."
                       (cdr raw-argv))))
           kwargs (expand-keyword-abbrevs short-kwargs))))
 
+(defmethod launch-substitution ((arg psub))
+  (let ((temp (mktemp)))
+    (values
+     (list (stringify-pathname temp))
+     (list (lambda () (delete-file-if-exists temp))
+           (launch-cmd arg :output temp :error-output nil)))))
+
 (defun parse-cmd (args)
-  (multiple-value-bind (argv kwargs) (argv+kwargs args)
+  (receive (argv kwargs) (argv+kwargs args)
     (make 'cmd :argv argv :kwargs kwargs)))
 
 (defun split-pipeline (args)
@@ -444,7 +501,7 @@ defaults to the value of SHELL in the environment)."
 
 (-> psub (&rest t) psub)
 (define-cmd-variant psub psub-shell (cmd &rest args)
-  (multiple-value-bind (argv kwargs) (argv+kwargs (cons cmd args))
+  (receive (argv kwargs) (argv+kwargs (cons cmd args))
     (make 'psub :argv argv :kwargs kwargs)))
 
 (-> get-tmpfs ()
@@ -478,11 +535,11 @@ When possible use a tmpfs."
 new argv and a list of subprocesses (or other cleanup forms)."
   (with-collectors (new-argv cleanup)
     (dolist (arg argv)
-      (if (typep arg 'psub)
-          (let ((temp (mktemp)))
-            (new-argv (stringify-pathname temp))
-            (cleanup (lambda () (delete-file-if-exists temp)))
-            (cleanup (launch-cmd arg :output temp :error-output nil)))
+      (if (typep arg 'substitution)
+          (receive (new-args cleanups)
+              (launch-substitution arg)
+            (mapc #'new-argv new-args)
+            (mapc #'cleanup cleanups))
           (new-argv arg)))))
 
 (defun launch-cmd (cmd &rest overrides &key &allow-other-keys)
@@ -500,7 +557,7 @@ newlines, like $(cmd) would in a shell.
 By default stderr is discarded."
   (chomp
    (with-output-to-string (s)
-     (multiple-value-bind (final subs)
+     (receive (final subs)
          (split-pipeline (cons cmd args))
        (multiple-value-call #'cmd
          (values-list subs)
@@ -529,7 +586,7 @@ Returns the actual exit code as a second value."
 (-> cmd! (&rest t) (values &optional))
 (define-cmd-variant cmd! sh! (cmd &rest args)
   "Run CMD purely for its side effects, discarding all output and returning nothing."
-  (multiple-value-bind (final subs) (split-pipeline (cons cmd args))
+  (receive (final subs) (split-pipeline (cons cmd args))
     (multiple-value-call #'cmd
       (values-list subs)
       :output nil

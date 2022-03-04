@@ -104,6 +104,16 @@
                      (psub "echo -e 'hello\nworld'")
                      (psub "echo -e 'goodbye\nworld'")))))))
 
+(unix-test psub-echo
+  (is-true (cmd? "diff" (psub-echo "x") (psub-echo "x")))
+  (is (equal "2c2"
+             (first
+              (lines
+               ($cmd "diff"
+                     :ignore-error-status t
+                     (psub-format "hello~%world")
+                     (psub-format "hello~%dolly")))))))
+
 (unix-test stringify-regression
   (finishes (cmd! :in "/tmp" "ls")))
 

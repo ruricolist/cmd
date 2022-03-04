@@ -83,6 +83,10 @@ Arguments are handled as follows:
    => NIL
    ```
 
+   (For this specific case, however – passing a string to a command
+   that expects a file – use `psub-echo` or `psub-format`, which don’t
+   actually call an external program.)
+
 ## The external program’s working directory
 
 Cmd is designed with multi-threaded programs in mind. It always runs
