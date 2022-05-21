@@ -159,7 +159,8 @@ The `cmd` package offers several entry points:
   ```
 
 - `$cmd` returns the output of the external program as a string,
-  stripping any trailing newline. (Much like `$(cmd)` in a shell.)
+  stripping any trailing newline. (Much like `$(cmd)` in a shell.) The
+  exit code is returned as a second value.
 
   ```lisp
   ($cmd "date")

@@ -549,21 +549,27 @@ new argv and a list of subprocesses (or other cleanup forms)."
     (values-list overrides)
     (values-list (cmd-kwargs cmd))))
 
-(-> $cmd (&rest t) (values string &optional))
+(-> $cmd (&rest t) (values string integer &optional))
 (define-cmd-variant $cmd $sh (cmd &rest args)
   "Return the results of CMD as a string, stripping any trailing
 newlines, like $(cmd) would in a shell.
 
+As a second value, return the error status.
+
 By default stderr is discarded."
-  (chomp
-   (with-output-to-string (s)
-     (receive (final subs)
-         (split-pipeline (cons cmd args))
-       (multiple-value-call #'cmd
-         (values-list subs)
-         :output s
-         (values-list final)
-         :error-output nil)))))
+  (let* ((exit-code)
+         (string
+           (chomp
+            (with-output-to-string (s)
+              (receive (final subs)
+                  (split-pipeline (cons cmd args))
+                (setf exit-code
+                      (multiple-value-call #'cmd
+                        (values-list subs)
+                        :output s
+                        (values-list final)
+                        :error-output nil)))))))
+    (values string exit-code)))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
 (define-cmd-variant cmd? sh? (cmd &rest args)
