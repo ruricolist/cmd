@@ -208,3 +208,19 @@
   (let ((*package* (find-package :keyword)))
     (is (some (op (search "(vterm)" _))
               (vterm-terminal '())))))
+
+(defun foo (string)
+  (cmd:$cmd "bash -c 'echo $0; echo busted >&2; exit 1'" string))
+
+(defun some-user-function ()
+  (let ((cmd::*null-error-output* (make-string-output-stream)))
+    (handler-case (foo "hello")
+      (uiop/run-program:subprocess-error ()
+        (princ (get-output-stream-string cmd::*null-error-output*))
+        ;; print or resignal an error using stderr output here
+        ))))
+
+(unix-test cmd-null-error-override
+  (is (string= (fmt "busted~%")
+               (with-output-to-string (*standard-output*)
+                 (some-user-function)))))

@@ -39,7 +39,9 @@
    :*terminal*
    :vterm-terminal
    :*cmd-env*
-   :*cmd-path*))
+   :*cmd-path*
+   :*null-output*
+   :*null-error-output*))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -49,6 +51,18 @@
 (def +pwd+ "pwd")
 (def +sh+ "/bin/sh")
 (def +tr+ "tr")
+
+(defparameter *null-output* nil
+  "Null device for standard output.
+
+By binding this variable you can redirect output that would otherwise
+be sent to the null device.")
+
+(defparameter *null-error-output* nil
+  "Null device for standard error.
+
+By binding this variable you can redirect error output that would
+otherwise be sent to the null device.")
 
 (defvar *shell*
   (let ((shell (getenv "SHELL")))
@@ -765,6 +779,17 @@ executable."
     (apply #'launch-program-in-dir dir tokens
            (remove-from-plist args :directory))))
 
+(defun override-default-output-and-error-output (args)
+  "Override null output with `*null-output*' and null error output
+with `*null-error-output*'."
+  (destructuring-bind (&key output error-output &allow-other-keys) args
+    (append
+     (and (null output)
+          `(:output ,*null-output*))
+     (and (null error-output)
+          `(:error-output ,*null-error-output*))
+     args)))
+
 (defun launch-program-in-dir (dir tokens
                               &rest args
                               &key
@@ -774,6 +799,8 @@ executable."
             ;; NB The :directory argument to launch-program may end up
             ;; calling `chdir', which is unacceptable.
             (wrap-with-dir dir tokens)))
+         (args
+           (override-default-output-and-error-output args))
          (proc
            (apply #'uiop:launch-program cmd args)))
     (run-hook *proc-hook* proc)
