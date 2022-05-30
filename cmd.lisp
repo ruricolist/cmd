@@ -758,7 +758,7 @@ executable."
         (t proc)))))
 
 (defun launch-program-in-dir* (tokens &rest args)
-  "Run a program (with uiop:run-program) in the current base directory."
+  "Run a program (with `uiop:launch-program') in the current base directory."
   (let ((dir (stringify-pathname
               (or (getf args :directory)
                   (current-dir)))))
