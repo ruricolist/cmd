@@ -41,7 +41,9 @@
    :*cmd-env*
    :*cmd-path*
    :*null-output*
-   :*null-error-output*))
+   :*null-error-output*
+   :cmd-error
+   :cmd-error-stderr))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -366,12 +368,55 @@ See `*visual-commands*'.")
          (kill-process-group subproc :urgent urgent))))
     (remhash proc *subprocs*)))
 
+(defcondition cmd-error (uiop:subprocess-error)
+  ((stderr :initarg :stderr :type string :reader cmd-error-stderr))
+  (:default-initargs :stderr "")
+  (:report (lambda (c s)
+             (format s "Subprocess ~@[~S~% ~]~@[with command ~S~% ~]exited with error~@[ code ~D~]~2%=== ERROR OUTPUT ===~%~a"
+                     (uiop:subprocess-error-process c)
+                     (uiop:subprocess-error-command c)
+                     (uiop:subprocess-error-code c)
+                     (let ((stderr (cmd-error-stderr c)))
+                       (ellipsize stderr 10000))))))
+
+(defun get-stderr-output-stream-string (s)
+  (file-position s 0)
+  (prog1 (read-stream-content-into-string s)
+    (ignore-errors
+     (close s))))
+
+(defun call/stderr-file (fn)
+  (uiop:with-temporary-file (:pathname p :keep nil :stream s)
+    #-windows (delete-file p)
+    (handler-bind ((uiop:subprocess-error
+                     (lambda (c)
+                       (error
+                        (make-condition
+                         'cmd-error
+                         :process (uiop:subprocess-error-process c)
+                         :command (uiop:subprocess-error-command c)
+                         :code (uiop:subprocess-error-code c)
+                         :stderr (get-stderr-output-stream-string s))))))
+        (funcall fn s))))
+
+(defmacro with-stderr-file ((var &key) &body body)
+  (with-thunk (body var)
+    `(call/stderr-file ,body)))
+
+(defmacro with-stderr-caching ((&key) &body body)
+  (with-thunk (body)
+    `(if *null-error-output*
+         (funcall ,body)
+         (with-stderr-file (*null-error-output*)
+           (,body)))))
+
 (defmacro define-cmd-variant (name sh-name lambda-list &body body)
   (let ((docstring (and (stringp (car body)) (pop body))))
     `(progn
        (defun ,name ,lambda-list
          ,@(unsplice docstring)
-         ,@body)
+         (with-stderr-caching ()
+           ,@body))
        (define-compiler-macro ,name (cmd &rest args)
          `(locally (declare (notinline ,',name))
             (,',name ,@(simplify-cmd-args (cons cmd args)))))
@@ -499,7 +544,7 @@ Except that it doesn't actually launch an external program."
     (values tail
             (ldiff args tail))))
 
-(-> stage-pipeline (list) cmd)
+(-> stage-pipeline (list) (values cmd &optional))
 (defun stage-pipeline (cmds)
   "Return CMDS as a single command that can be passed to `launch-pipeline'."
   (reduce (lambda (outer inner)
@@ -509,11 +554,11 @@ Except that it doesn't actually launch an external program."
           cmds
           :from-end t))
 
-(-> cmdq (&rest t) cmd)
+(-> cmdq (&rest t) (values cmd &optional))
 (define-cmd-variant cmdq shq (cmd &rest args)
   (parse-cmd (cons cmd args)))
 
-(-> psub (&rest t) psub)
+(-> psub (&rest t) (values psub &optional))
 (define-cmd-variant psub psub-shell (cmd &rest args)
   (receive (argv kwargs) (argv+kwargs (cons cmd args))
     (make 'psub :argv argv :kwargs kwargs)))
@@ -582,7 +627,7 @@ By default stderr is discarded."
                         (values-list subs)
                         :output s
                         (values-list final)
-                        :error-output nil)))))))
+                        :error-output *null-error-output*)))))))
     (values string exit-code)))
 
 (-> cmd? (&rest t) (values boolean integer &optional))
