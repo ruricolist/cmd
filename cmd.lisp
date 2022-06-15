@@ -372,12 +372,13 @@ See `*visual-commands*'.")
   ((stderr :initarg :stderr :type string :reader cmd-error-stderr))
   (:default-initargs :stderr "")
   (:report (lambda (c s)
-             (format s "Subprocess ~@[~S~% ~]~@[with command ~S~% ~]exited with error~@[ code ~D~]~2%=== ERROR OUTPUT ===~%~a"
+             (format s "Subprocess ~@[~S~% ~]~@[with command ~S~% ~]exited with error~@[ code ~D~]~@[~2%=== ERROR OUTPUT ===~%~a~]"
                      (uiop:subprocess-error-process c)
                      (uiop:subprocess-error-command c)
                      (uiop:subprocess-error-code c)
                      (let ((stderr (cmd-error-stderr c)))
-                       (ellipsize stderr 10000))))))
+                       (unless (emptyp stderr)
+                         (ellipsize stderr 10000)))))))
 
 (defun get-stderr-output-stream-string (s)
   (file-position s 0)
