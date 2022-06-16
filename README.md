@@ -164,7 +164,7 @@ The `cmd` package offers several entry points:
 
   ```lisp
   ($cmd "date")
-  => "Sun Sep 27 15:43:01 CDT 2020"
+  => "Sun Sep 27 15:43:01 CDT 2020", 0
   ```
 
 - `cmd!` runs an external program purely for side effects, discarding
@@ -178,8 +178,8 @@ The `cmd` package offers several entry points:
 
   ```lisp
   (cmd? "kill -0" pid)
-  => T # PID is a live process
-  => NIL # PID is not a live process
+  => T, 0   ;; PID is a live process
+  => NIL, 1 ;; PID is not a live process
   ```
 
 - `cmd&` runs an external program asynchronously (with
