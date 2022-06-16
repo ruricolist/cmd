@@ -288,7 +288,7 @@ On Windows only, the first argument (the program name) has `.exe` appended to it
 
 ## Efficiency
 
-While `cmd` does not use a shell to interpret its arguments, it does still have to run a shell (`sh` on Unix, `cmd.exe` on Windows) in order to change the working directory of the program.
+While `cmd` does not use a shell to interpret its arguments, it may still have to run a shell (`sh` on Unix, `cmd.exe` on Windows) in order to change the working directory of the program.
 
 How inefficient this is depends on what your distribution uses as a shell; it is faster when `sh` is, say, `dash`, than when it is `bash`.
 
