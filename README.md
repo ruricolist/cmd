@@ -190,6 +190,15 @@ The `cmd` package offers several entry points:
   => #<PROCESS-INFO ...>
   ```
 
+## Error handling
+
+By default, Cmd stores the stderr of a process, and if there is an
+error (due to non-zero exit) it presents the stderr as part of the
+error message.
+
+Accordingly cmd errors are a subclass of `uiop:subprocess-error`. The
+stored stderr can be accessed with `cmd:cmd-error-stderr`.
+
 ## Redirection
 
 Redirection is accomplished via either tokenized strings or keyword
