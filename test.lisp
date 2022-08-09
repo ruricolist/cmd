@@ -224,3 +224,10 @@
   (is (string= (fmt "busted~%")
                (with-output-to-string (*standard-output*)
                  (some-user-function)))))
+
+(unix-test private-stderr-stream-regression
+  (let ((error
+          (handler-case
+              (foo "hello")
+            (error (e) e))))
+    (is (string*= "busted" (princ-to-string error)))))

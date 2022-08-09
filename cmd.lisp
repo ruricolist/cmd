@@ -387,18 +387,24 @@ See `*visual-commands*'.")
      (close s))))
 
 (defun call/stderr-file (fn)
-  (uiop:with-temporary-file (:pathname p :keep nil :stream s)
-    #-windows (delete-file p)
-    (handler-bind ((uiop:subprocess-error
-                     (lambda (c)
-                       (error
-                        (make-condition
-                         'cmd-error
-                         :process (uiop:subprocess-error-process c)
-                         :command (uiop:subprocess-error-command c)
-                         :code (uiop:subprocess-error-code c)
-                         :stderr (get-stderr-output-stream-string s))))))
-        (funcall fn s))))
+  (uiop:with-temporary-file (:pathname p :keep nil)
+    (with-open-file (s p
+                       :direction :io
+                       :element-type 'character
+                       :allow-other-keys t
+                       ;; For CCL.
+                       :sharing :external)
+      #-windows (delete-file p)
+      (handler-bind ((uiop:subprocess-error
+                       (lambda (c)
+                         (error
+                          (make-condition
+                           'cmd-error
+                           :process (uiop:subprocess-error-process c)
+                           :command (uiop:subprocess-error-command c)
+                           :code (uiop:subprocess-error-code c)
+                           :stderr (get-stderr-output-stream-string s))))))
+        (funcall fn s)))))
 
 (defmacro with-stderr-file ((var &key) &body body)
   (with-thunk (body var)
