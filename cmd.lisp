@@ -398,6 +398,7 @@ See `*visual-commands*'.")
       #-windows (delete-file p)
       (handler-bind ((uiop:subprocess-error
                        (lambda (c)
+                         (finish-output s)
                          (error
                           (make-condition
                            'cmd-error
