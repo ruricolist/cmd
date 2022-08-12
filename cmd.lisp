@@ -392,6 +392,7 @@ See `*visual-commands*'.")
                        :direction :io
                        :element-type 'character
                        :allow-other-keys t
+                       :if-exists :rename-and-delete
                        ;; For CCL.
                        :sharing :external)
       #-windows (delete-file p)
