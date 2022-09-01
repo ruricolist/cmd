@@ -1,6 +1,7 @@
 # cmd
 
-A utility for running external programs, built on [UIOP][].
+A utility for running external programs, built on
+[`uiop:launch-program`][UIOP].
 
 Cmd is designed to:
 
@@ -27,10 +28,10 @@ Arguments are handled as follows:
 
    ``` lisp
    (cmd "ls -al")
-   ≡ (uiop:run-program '("ls" "-al"))
+   ≅ (uiop:wait-process (uiop:launch-program '("ls" "-al")))
 
    (cmd "echo 'hello world'")
-   ≡ (uiop:run-program '("echo" "hello world"))
+   ≅ (uiop:wait-process (uiop:launch-program '("echo" "hello world")))
    ```
 
    Redirection operators in the tokenized string (such as `<`, `>`, or
@@ -39,7 +40,6 @@ Arguments are handled as follows:
    ```lisp
    (cmd "echo 'hello world' > myfile")
    ≡ (cmd '("echo" "hello world" :> "myfile"))
-   ≡ (uiop:run-program '("echo" "hello world") :output "myfile")
    ```
 
 2. A list is added directly to the list of arguments (not tokenized).
@@ -61,7 +61,6 @@ Arguments are handled as follows:
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
    ≡ (cmd :ignore-error-status t "bash -c 'exit 1'")
    ≡ (cmd "bash -c" :ignore-error-status t '("exit 1"))
-   ≡ (uiop:run-program '("bash" "-c" "exit 1") :ignore-error-status t)
    ```
 
    Note that unlike normal Lisp functions, keyword arguments can

@@ -689,7 +689,7 @@ an argument to the command. The native namestring is not permitted to
 start with a dash.
 
 A property list is treated as a list of keyword arguments to
-`uiop:run-program'. Certain keywords are treated as abbreviations:
+`uiop:launch-program'. Certain keywords are treated as abbreviations:
 e.g. `:>' is an abbreviation for `:output'. Abbreviations can be
 compound: e.g. `:>>' affects both `:output' and `:if-exists'.
 
