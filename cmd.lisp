@@ -30,6 +30,7 @@
    :sh :$sh :sh? :sh! :sh&
    :with-cmd-dir
    :with-working-directory
+   :current-directory
    :psub
    :psub-echo
    :psub-format
@@ -150,10 +151,15 @@ directory if that is not absolute."
                         *default-pathname-defaults*
                         dir))))))
 
-(-> current-dir () (values absolute-directory-pathname &optional))
-(defun current-dir ()
-  "Get the current directory based on `*default-pathname-defaults*'."
+(-> current-directory () (values absolute-directory-pathname &optional))
+(defun current-directory ()
+  "Get the absolute current directory based on `*default-pathname-defaults*'."
   (resolve-dir *default-pathname-defaults*))
+
+(-> (setf current-directory) (absolute-pathname)
+  (values absolute-pathname &optional))
+(defun (setf current-directory) (value)
+  (setf *default-pathname-defaults* value))
 
 (defun can-use-env-c? ()
   "Return T if we can use env -C to launch a program in the current
@@ -829,7 +835,7 @@ executable."
   "Run a program (with `uiop:launch-program') in the current base directory."
   (let ((dir (stringify-pathname
               (or (getf args :directory)
-                  (current-dir)))))
+                  (current-directory)))))
     (apply #'launch-program-in-dir dir tokens
            (remove-from-plist args :directory))))
 
