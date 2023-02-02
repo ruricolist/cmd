@@ -231,3 +231,8 @@
               (foo "hello")
             (error (e) e))))
     (is (string*= "busted" (princ-to-string error)))))
+
+(test pathname-with-space
+  (with-working-directory ((asdf:system-relative-pathname "cmd" "test/"))
+    (is (uiop:directory-exists-p "foo bar"))
+    (is (string= "a file" ($cmd "ls" #p"foo bar")))))
