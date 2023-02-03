@@ -960,7 +960,8 @@ arguments."
                          acc))))
          (pathname
           (rec args
-               (cons (stringify-pathname arg) acc)))
+               (cons (make-string-token (stringify-pathname arg))
+                     acc)))
          (list
           (rec args
                (revappend (parse-cmd-args arg :split nil)

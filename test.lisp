@@ -235,4 +235,6 @@
 (test pathname-with-space
   (with-working-directory ((asdf:system-relative-pathname "cmd" "test/"))
     (is (uiop:directory-exists-p "foo bar"))
-    (is (string= "a file" ($cmd "ls" #p"foo bar")))))
+    (is (string= "a file" ($cmd "ls" #p"foo bar")))
+    (locally (declare (notinline $cmd))
+      (is (string= "a file" ($cmd "ls" #p"foo bar"))))))
