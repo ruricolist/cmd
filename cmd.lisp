@@ -186,7 +186,7 @@ directory, instead of using a shell."
 (uiop:register-image-restore-hook 'update-can-use-env-c)
 
 (defconst +redirection-operators+
-  '(:< :> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<< :>? :2>?)
+  '(:< :> :<> :1> :>> :1>> :|>\|| :2> :2>> :|2>\|| :&> :>& :&>> :>>& :<<< :>? :2>?)
   "All redirection operators that can be parsed in tokenized strings.")
 
 (defconst +subcommand-dividers+
@@ -224,6 +224,7 @@ directory, instead of using a shell."
       (:in '(:directory _))
       (:< '(:input _))
       ((:> :1>) '(:output _))
+      ((:<>) '(:input _ :output _))
       ((:>> :1>>) '(:if-output-exists :append :output _))
       (:|>\|| '(:if-output-exists :supersede :output _))
       (:2> '(:error-output _))
