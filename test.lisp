@@ -45,7 +45,7 @@
 (unix-test here-string
   (is (equal* ($cmd "bash -c" '("read x; echo \"$x\"") :<<< "hello")
               ($cmd "bash -c" '("read x; echo \"$x\"; exit 1") :<<< "hello"
-                    :ignore-error-status t)
+                    :check nil)
               ($sh "read x; echo \"$x\"" :<<< "hello")
               "hello")))
 
@@ -100,7 +100,7 @@
              (first
               (lines
                ($cmd "diff"
-                     :ignore-error-status t
+                     :check nil
                      (psub "echo -e 'hello\nworld'")
                      (psub "echo -e 'goodbye\nworld'")))))))
 
@@ -110,7 +110,7 @@
              (first
               (lines
                ($cmd "diff"
-                     :ignore-error-status t
+                     :check nil
                      (psub-format "hello~%world")
                      (psub-format "hello~%dolly")))))))
 

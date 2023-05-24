@@ -60,11 +60,17 @@ Arguments are handled as follows:
    ``` lisp
    (cmd "bash -c 'exit 1'" :ignore-error-status t)
    ≡ (cmd :ignore-error-status t "bash -c 'exit 1'")
+   ≡ (cmd :check nil "bash -c 'exit 1'")
    ≡ (cmd "bash -c" :ignore-error-status t '("exit 1"))
+   ≡ (cmd "bash -c" :check nil '("exit 1"))
    ```
 
    Note that unlike normal Lisp functions, keyword arguments can
    appear anywhere, not just at the end.
+
+   Also note that `:check` is accepted as an alias for
+   `:ignore-error-status`, although the value is negated before being
+   passed to UIOP.
 
 4. Any character, integer, or pathname is directly added to the list
    of arguments, as if it were an escaped string. (It is an error if a

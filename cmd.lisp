@@ -242,12 +242,15 @@ directory, instead of using a shell."
 
 (def +dividers+ '(:|\||))
 
-(defun expand-keyword-abbrevs (args)
+(defun expand-keyword-aliases (args)
   (collecting
     (doplist (k v args)
-      (if-let (exp (expand-redirection-abbrev k))
-        (apply #'collect (substitute v '_ exp))
-        (collect k v)))))
+      (let ((exp (expand-redirection-abbrev k)))
+        (cond (exp
+               (apply #'collect (substitute v '_ exp)))
+              ((eql k :check)
+               (collect :ignore-error-status (not v)))
+              (t (collect k v)))))))
 
 (defun call/cmd-dir (fn dir)
   (let* ((*default-pathname-defaults* (resolve-dir dir)))
@@ -537,7 +540,7 @@ Except that it doesn't actually launch an external program."
            (and raw-argv
                 (cons (exe-string (car raw-argv))
                       (cdr raw-argv))))
-          kwargs (expand-keyword-abbrevs short-kwargs))))
+          kwargs (expand-keyword-aliases short-kwargs))))
 
 (defmethod launch-substitution ((arg psub))
   (let ((temp (mktemp)))
