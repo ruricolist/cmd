@@ -46,7 +46,8 @@
   (is (equal* ($cmd "bash -c" '("read x; echo \"$x\"") :<<< "hello")
               ($cmd "bash -c" '("read x; echo \"$x\"; exit 1") :<<< "hello"
                     :check nil)
-              ($sh "read x; echo \"$x\"" :<<< "hello")
+              (let ((*shell* (resolve-executable "bash")))
+                ($sh "read x; echo \"$x\"" :<<< "hello"))
               "hello")))
 
 (unix-test pipelines
