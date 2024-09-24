@@ -68,7 +68,7 @@ Arguments are handled as follows:
    Note that unlike normal Lisp functions, keyword arguments can
    appear anywhere, not just at the end.
 
-   Also note that `:check` is accepted as an alias for
+   Also note `:check` is accepted as an alias for
    `:ignore-error-status`, although the value is negated before being
    passed to UIOP.
 
@@ -77,7 +77,7 @@ Arguments are handled as follows:
    pathname begins with `-`.)
 
 5. Cmd supports a basic form of process substitution, running
-   processes as input to commands that expect files. To construct a
+   processes as input to commands expecting files. To construct a
    process substitution, use the `psub` Lisp function.
 
    ``` lisp
@@ -89,7 +89,7 @@ Arguments are handled as follows:
    ```
 
    (For this specific case, however – passing a string to a command
-   that expects a file – use `psub-echo` or `psub-format`, which don’t
+   expecting a file – use `psub-echo` or `psub-format`, which don’t
    actually call an external program.)
 
 ## The external program’s working directory
@@ -97,8 +97,8 @@ Arguments are handled as follows:
 Cmd is designed with multi-threaded programs in mind. It always runs
 programs with their working directory relative to
 [`*default-pathname-defaults*`][dpd]. This is because the OS-level
-working directory a program, on both Windows and Unix, is the working
-directory of the entire process, not the individual thread, and
+working directory of a program, on both Windows and Unix, is the working
+directory for the entire process, not the individual thread, and
 changing it changes it for all threads.
 
 You can also specify the directory for a particular command with the
@@ -179,7 +179,7 @@ The `cmd` package offers several entry points:
 - `cmd?` returns `t` if the external program returned `0`, and `nil`
   otherwise, with the exit code as a second value. As other variants
   by default signal an error if the process exists non-zero, `cmd?` is
-  useful for programs that are expected to fail.
+  useful for programs expected to fail.
 
   ```lisp
   (cmd? "kill -0" pid)
@@ -201,7 +201,7 @@ By default, Cmd stores the stderr of a process, and if there is an
 error (due to non-zero exit) it presents the stderr as part of the
 error message.
 
-Accordingly cmd errors are a subclass of `uiop:subprocess-error`. The
+Accordingly `cmd` errors are a subclass of `uiop:subprocess-error`. The
 stored stderr can be accessed with `cmd:cmd-error-stderr`.
 
 ## Redirection
@@ -227,7 +227,7 @@ shell.
 => hello world
 goodbye world
 
-;;; Using tokenized strings.
+;;; Equivalents using tokenized strings.
 (cmd "echo 'hello world' > hello.txt")
 (cmd "cat hello.txt")
 => hello world
@@ -258,7 +258,7 @@ Supported directions include:
 - `:&>>`, `:>>&` Append stdout and stderr.
 - `:<<<` Provide input from a “here string”.
 
-Note that redirections are interpreted according to the rules for Lisp
+Note redirections are interpreted according to the rules for Lisp
 keywords (only the first occurrence of a keyword argument matters),
 not the side-effecting rules for redirections in POSIX shells.
 
@@ -304,9 +304,9 @@ On Windows only, the first argument (the program name) has `.exe` appended to it
 
 While `cmd` does not use a shell to interpret its arguments, it may still have to run a shell (`sh` on Unix, `cmd.exe` on Windows) in order to change the working directory of the program.
 
-How inefficient this is depends on what your distribution uses as a shell; it is faster when `sh` is, say, `dash`, than when it is `bash`.
+How inefficient this is depends on what your distribution uses as `/bin/sh`; it is faster when `/bin/sh` is, say, `dash`, than when it is `bash`.
 
-Recent versions of GNU `env` support a `-C` switch to do this directly. When that is supported (support is detected dynamically) then `env -C` is used in place of a shell and overhead is negligible.
+Recent versions of GNU `env` support a `-C` switch to do this directly. When support is detected dynamically, then `env -C` is used in place of a shell and overhead is negligible.
 
 ## Past
 
