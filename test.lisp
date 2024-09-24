@@ -3,7 +3,7 @@
   ;; Internal symbols.
   (:import-from
     :cmd/cmd
-    :expand-keyword-abbrevs
+    :expand-keyword-aliases
     :split-cmd
     :flatten-string-tokens
     :kill-process-group
@@ -65,10 +65,10 @@
                  (lines string2)))
     (is (equal string1 string2))))
 
-(test expand-keyword-abbrevs
+(test expand-keyword-aliases
   (is
    (equal
-    (expand-keyword-abbrevs '(:|2>\|| "bar.txt"))
+    (expand-keyword-aliases '(:|2>\|| "bar.txt"))
     '(:if-error-output-exists :supersede
       :error-output "bar.txt"))))
 
