@@ -156,10 +156,12 @@ directory if that is not absolute."
   "Get the absolute current directory based on `*default-pathname-defaults*'."
   (resolve-dir *default-pathname-defaults*))
 
-(-> (setf current-directory) (absolute-pathname)
-  (values absolute-pathname &optional))
+(-> (setf current-directory) (pathname)
+  (values absolute-directory-pathname &optional))
 (defun (setf current-directory) (value)
-  (setf *default-pathname-defaults* value))
+  (setf *default-pathname-defaults*
+        (assure absolute-directory-pathname
+          (resolve-dir value))))
 
 (defun can-use-env-c? ()
   "Return T if we can use env -C to launch a program in the current
