@@ -28,6 +28,7 @@
   (:export
    :cmd :$cmd :cmd? :cmd! :cmd&
    :sh :$sh :sh? :sh! :sh&
+   :cmd-parse
    :with-cmd-dir
    :with-working-directory
    :current-directory
@@ -554,6 +555,17 @@ Except that it doesn't actually launch an external program."
 (defun parse-cmd (args)
   (receive (argv kwargs) (argv+kwargs args)
     (make 'cmd :argv argv :kwargs kwargs)))
+
+(defun cmd-parse (command)
+  "Parse COMMAND like `cmd' does.
+Returns two values: the fully tokenized command, and a list of
+redirection arguments (in the format expected by
+`uiop:launch-program').
+
+This can be used to write your own functions that take the `cmd' DSL."
+  (let ((cmd (parse-cmd command)))
+    (values (flatten-string-tokens (cmd-argv cmd))
+            (flatten-string-tokens (cmd-kwargs cmd)))))
 
 (defun split-pipeline (args)
   "Split ARGS into two values: the last command in the pipeline, and any previous commands."
