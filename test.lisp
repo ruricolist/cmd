@@ -2,13 +2,14 @@
   (:use :cl :cmd/cmd :fiveam :alexandria :serapeum)
   ;; Internal symbols.
   (:import-from
-    :cmd/cmd
-    :expand-keyword-aliases
-    :split-cmd
-    :flatten-string-tokens
-    :kill-process-group
-    :wrap-cmd-env
-    :vterm-terminal)
+   :cmd/cmd
+   :parse-cmd-dsl
+   :expand-keyword-aliases
+   :flatten-string-tokens
+   :kill-process-group
+   :split-cmd
+   :vterm-terminal
+   :wrap-cmd-env)
   (:import-from :uiop :os-unix-p :subprocess-error)
   (:export :run-tests))
 (in-package :cmd/test)
@@ -239,3 +240,10 @@
     (is (string= "a file" ($cmd "ls" #p"foo bar")))
     (locally (declare (notinline $cmd))
       (is (string= "a file" ($cmd "ls" #p"foo bar"))))))
+
+(test parse-cmd-dsl
+  (is (equal
+       (multiple-value-list
+        (parse-cmd-dsl '("echo 'hello world' > myfile")))
+       '(("echo" "hello world")
+         (:output "myfile")))))

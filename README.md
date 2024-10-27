@@ -92,6 +92,15 @@ Arguments are handled as follows:
    expecting a file – use `psub-echo` or `psub-format`, which don’t
    actually call an external program.)
 
+### Parsing the `cmd` DSL
+
+You can use the `cmd` DSL in your own programs with `cmd:parse-cmd-dsl`. This takes a list of arguments and returns two values: a fully-tokenized list of command arguments and a list of keyword arguments, both suitable for passsing to `uiop:launch-program`.
+
+``` lisp
+(parse-cmd-dsl '("echo 'hello world' > myfile"))
+=> ("echo" "hello world"), (:OUTPUT "myfile")
+```
+
 ## The external program’s working directory
 
 Cmd is designed with multi-threaded programs in mind. It always runs
