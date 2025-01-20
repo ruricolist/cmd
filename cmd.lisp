@@ -385,13 +385,15 @@ See `*visual-commands*'.")
   ((stderr :initarg :stderr :type string :reader cmd-error-stderr))
   (:default-initargs :stderr "")
   (:report (lambda (c s)
-             (format s "Subprocess ~@[~S~% ~]~@[with command ~S~% ~]exited with error~@[ code ~D~]~@[~2%=== ERROR OUTPUT ===~%~a~]"
+             (format s "Subprocess ~@[~S~% ~] exited with error~@[ code ~D~]~@[~2%=== ERROR OUTPUT ===~%~a~]~@[~&~%=== COMMAND ===~%~a~% ~]"
                      (uiop:subprocess-error-process c)
-                     (uiop:subprocess-error-command c)
                      (uiop:subprocess-error-code c)
                      (let ((stderr (cmd-error-stderr c)))
                        (unless (emptyp stderr)
-                         (ellipsize stderr 10000)))))))
+                         (ellipsize stderr 10000)))
+                     (quote-pipeline
+                      (list
+                       (uiop:subprocess-error-command c)))))))
 
 (defun get-stderr-output-stream-string (s)
   (file-position s 0)
@@ -776,6 +778,12 @@ executable."
         ((list* x xs)
          (rec xs (cons x args-out)))))))
 
+(defun quote-pipeline (commands)
+  (fmt "~{~{~a~^ ~}~^ | ~}"
+       (mapcar (op (mapcar #'shlex:quote _))
+               (flatten-string-tokens
+                commands))))
+
 (-> cmd& (&rest t) (values process-info list list &optional))
 (define-cmd-variant cmd& sh& (cmd &rest args)
   "Like `cmd', but run asynchronously and return a handle on the process (as from `launch-program')."
@@ -785,10 +793,8 @@ executable."
            (pipeline (append1 subs final)))
     (when *message-hook*
       (run-hook *message-hook*
-                (fmt "$ ~{~{~a~^ ~}~^ | ~}"
-                     (mapcar (op (mapcar #'shlex:quote _))
-                             (flatten-string-tokens
-                              (mapcar #'cmd-argv pipeline))))))
+                (quote-pipeline
+                 (mapcar #'cmd-argv pipeline))))
     (flet ((launch ()
              (let* ((cmd (stage-pipeline pipeline))
                     (argv (flatten-string-tokens (cmd-argv cmd)))
