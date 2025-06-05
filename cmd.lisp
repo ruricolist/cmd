@@ -394,10 +394,11 @@ See `*visual-commands*'.")
                          (ellipsize stderr 10000)))))))
 
 (defun get-stderr-output-stream-string (s)
-  (file-position s 0)
-  (prog1 (read-stream-content-into-string s)
-    (ignore-errors
-     (close s))))
+  (let ((end (file-position s)))
+    (file-position s 0)
+    (prog1 (take end (read-stream-content-into-string s))
+      (ignore-errors
+       (close s)))))
 
 (defun call/stderr-file (fn)
   (uiop:with-temporary-file (:pathname p :keep nil)
@@ -405,7 +406,7 @@ See `*visual-commands*'.")
                        :direction :io
                        :element-type 'character
                        :allow-other-keys t
-                       :if-exists :rename-and-delete
+                       :if-exists :overwrite
                        ;; For CCL.
                        :sharing :external)
       #-windows (delete-file p)
@@ -413,12 +414,11 @@ See `*visual-commands*'.")
                        (lambda (c)
                          (finish-output s)
                          (error
-                          (make-condition
-                           'cmd-error
-                           :process (uiop:subprocess-error-process c)
-                           :command (uiop:subprocess-error-command c)
-                           :code (uiop:subprocess-error-code c)
-                           :stderr (get-stderr-output-stream-string s))))))
+                          'cmd-error
+                          :process (uiop:subprocess-error-process c)
+                          :command (uiop:subprocess-error-command c)
+                          :code (uiop:subprocess-error-code c)
+                          :stderr (get-stderr-output-stream-string s)))))
         (funcall fn s)))))
 
 (defmacro with-stderr-file ((var &key) &body body)
