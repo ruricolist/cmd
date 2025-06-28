@@ -394,10 +394,16 @@ See `*visual-commands*'.")
                          (ellipsize stderr 10000)))))))
 
 (defun get-stderr-output-stream-string (s)
-  (file-position s 0)
-  (prog1 (read-stream-content-into-string s)
-    (ignore-errors
-     (close s))))
+  "Get output from S.
+Note this will only be called if an error is signaled."
+  (finish-output s)
+  (let ((end (file-position s)))
+    (file-position s 0)
+    (prog1 (read-sequence
+            (make-array end :element-type (stream-element-type s))
+            s)
+      (ignore-errors
+       (close s)))))
 
 (defun call/stderr-file (fn)
   (uiop:with-temporary-file (:pathname p :keep nil)
@@ -405,13 +411,12 @@ See `*visual-commands*'.")
                        :direction :io
                        :element-type 'character
                        :allow-other-keys t
-                       :if-exists :rename-and-delete
+                       :if-exists :overwrite
                        ;; For CCL.
                        :sharing :external)
       #-windows (delete-file p)
       (handler-bind ((uiop:subprocess-error
                        (lambda (c)
-                         (finish-output s)
                          (error
                           'cmd-error
                           :process (uiop:subprocess-error-process c)
