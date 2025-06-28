@@ -31,14 +31,15 @@
          (skip "Not on Unix"))))
 
 (unix-test unix-cmd
-  (is (equal* "hello"
-              ($cmd "echo hello")
-              ($cmd '("echo" "hello"))
-              ($cmd "echo" #p"hello")
-              ($cmd '("echo" #p "hello"))
-              ($sh "echo hello")
-              ($sh "echo 'hello'")
-              ($sh "echo \"hello\"")))
+  (let ((*shell* (resolve-executable "bash")))
+    (is (equal* "hello"
+                ($cmd "echo hello")
+                ($cmd '("echo" "hello"))
+                ($cmd "echo" #p"hello")
+                ($cmd '("echo" #p "hello"))
+                ($sh "echo hello")
+                ($sh "echo 'hello'")
+                ($sh "echo \"hello\""))))
   (let ((file (asdf:system-relative-pathname :cmd "test/literal.txt")))
     (is (equal (chomp (read-file-into-string file))
                ($cmd "cat" file)))))
