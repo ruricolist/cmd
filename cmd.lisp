@@ -66,7 +66,11 @@ be sent to the null device.")
   "Null device for standard error.
 
 By binding this variable you can redirect error output that would
-otherwise be sent to the null device.")
+otherwise be sent to the null device.
+
+Note that when error output is not specifically redirected, this
+variable is bound to a stream that stashes stderr output for error
+reporting.")
 
 (defvar *shell*
   (let ((shell (getenv "SHELL")))
@@ -397,11 +401,11 @@ See `*visual-commands*'.")
   "Get output from S.
 Note this will only be called if an error is signaled."
   (finish-output s)
-  (let ((end (file-position s)))
+  (let* ((end (file-position s))
+         (seq (make-array end :element-type (stream-element-type s))))
     (file-position s 0)
-    (prog1 (read-sequence
-            (make-array end :element-type (stream-element-type s))
-            s)
+    (read-sequence seq s)
+    (prog1 seq
       (ignore-errors
        (close s)))))
 
@@ -820,7 +824,12 @@ executable."
   ;; codes won't work; on SBCL at least, in a pipeline the exit status
   ;; is apparently always 0.
   (destructuring-bind (&key input
-                         (output *standard-output*) (error-output *error-output*)
+                         (output *standard-output*)
+                         (error-output
+                          (make-broadcast-stream
+                           ;; Stash stderr output for error reporting.
+                           *null-error-output*
+                           *error-output*))
                        &allow-other-keys) args
     (mvlet* ((prev (and (typep input 'cmd)
                         (launch-cmd input :output :stream)))
