@@ -45,7 +45,8 @@
    :*null-output*
    :*null-error-output*
    :cmd-error
-   :cmd-error-stderr))
+   :cmd-error-stderr
+   :*pipefail*))
 (in-package :cmd)
 
 ;;; External executables, isolated for Guix compatibility.
@@ -82,6 +83,10 @@ reporting.")
   "The shell to use for shell commands.
 
 Defaults to $SHELL.")
+
+(defvar *pipefail*
+  nil
+  "Whether to signal for non-zero exit of pipe subcommands.")
 
 (declaim (type (soft-list-of cons) *cmd-env*))
 (defvar *cmd-env* '()
@@ -364,26 +369,43 @@ See `*visual-commands*'.")
 
 (defun register-subproc (proc subproc)
   "Register SUBPROC as a subprocess of PROC and return SUBPROC."
-  (register-subprocs proc subproc)
-  (values))
+  (declare (process-info proc)
+           (subproc-designator subproc))
+  (assert (not (eql proc subproc)))
+  (register-subprocs proc (list subproc))
+  subproc)
 
-(defun register-subprocs (proc &rest subprocs)
-  "Register SUBPROC as a subprocess of PROC."
-  (synchronized ('*subprocs*)
-    (unionf (subprocs proc) subprocs)
-    (values)))
+(defun register-subprocs (proc subprocs)
+  "Register SUBPROCS as subprocesses of PROC and return SUBPROCS."
+  (when subprocs
+    (assert (every (of-type 'subproc-designator) subprocs))
+    (synchronized ('*subprocs*)
+      (dolist (subproc subprocs)
+        (push subproc (subprocs proc)))))
+  subprocs)
 
-(defun kill-subprocs (proc &key urgent)
+(defun kill-subprocs (proc &key urgent (group t))
   "Kill all subprocesses of PROC."
-  (synchronized ('*subprocs*)
-    (dolist (subproc (subprocs proc))
-      (etypecase subproc
-        ;; Arbitrary cleanup.
-        (function (funcall subproc))
-        (process-info
-         (kill-subprocs subproc :urgent urgent)
-         (kill-process-group subproc :urgent urgent))))
-    (remhash proc *subprocs*)))
+  (flet ((kill-subproc (subproc &key tokens)
+           (declare (process-info subproc))
+           (kill-subprocs subproc :urgent urgent)
+           (kill-process-group subproc :urgent urgent :group group)
+           (handle-status subproc
+                          :ignore-error-status
+                          (not *pipefail*)
+                          :tokens tokens)))
+    (synchronized ('*subprocs*)
+      (dolist (subproc (subprocs proc))
+        (etypecase subproc
+          ;; Arbitrary cleanup.
+          (function (funcall subproc))
+          (process-info
+           (kill-subproc subproc))
+          (subproc
+           (kill-subproc
+            (subproc-proc subproc)
+            :tokens (subproc-tokens subproc)))))
+      (remhash proc *subprocs*))))
 
 (defcondition cmd-error (uiop:subprocess-error)
   ((stderr :initarg :stderr :type string :reader cmd-error-stderr))
@@ -477,6 +499,20 @@ defaults to the value of SHELL in the environment)."
   (:documentation "A single subcommand, with argv and kwargs ready to
   pass to `uiop:launch-program'."))
 
+(defclass subproc ()
+  ((proc
+    :initarg :proc
+    :reader subproc-proc
+    :type process-info)
+   (tokens
+    :initarg :tokens
+    :reader subproc-tokens
+    :type list))
+  (:documentation "A subprocess/argv tuple."))
+
+(deftype subproc-designator ()
+  '(or process-info subproc function))
+
 (defclass substitution ()
   ()
   (:documentation "A command substitution."))
@@ -553,12 +589,15 @@ Except that it doesn't actually launch an external program."
                       (cdr raw-argv))))
           kwargs (expand-keyword-aliases short-kwargs))))
 
-(defmethod launch-substitution ((arg psub))
+(defmethod launch-substitution ((cmd psub))
   (let ((temp (mktemp)))
     (values
      (list (stringify-pathname temp))
      (list (lambda () (delete-file-if-exists temp))
-           (launch-cmd arg :output temp :error-output nil)))))
+           (make 'subproc
+                 :proc
+                 (launch-cmd cmd :output temp :error-output nil)
+                 :tokens (cmd-argv cmd))))))
 
 (defun parse-cmd (args)
   (receive (argv kwargs) (argv+kwargs args)
@@ -820,9 +859,6 @@ executable."
         (launch)))))
 
 (defun launch-pipeline (argv &rest args)
-  ;; TODO Need an equivalent to pipefail. Checking the process exit
-  ;; codes won't work; on SBCL at least, in a pipeline the exit status
-  ;; is apparently always 0.
   (destructuring-bind (&key input
                          (output *standard-output*)
                          (error-output
@@ -848,7 +884,7 @@ executable."
                      (values-list args)
                      :output output
                      :error-output error-output)))
-      (apply #'register-subprocs proc psubs)
+      (register-subprocs proc psubs)
       (when prev
         (register-subproc proc prev))
       (cond
@@ -857,10 +893,18 @@ executable."
          (error "Not implemented yet"))
         ((typep output 'cmd)
          (lret ((next (launch-cmd output :input (process-info-output proc))))
-           (register-subproc next proc)))
+           (register-subproc
+            next
+            (make 'subproc
+                  :proc proc
+                  :tokens argv))))
         ((typep error-output 'cmd)
          (lret ((enext (launch-cmd error-output :input (process-info-error-output proc))))
-           (register-subproc enext proc)))
+           (register-subproc
+            enext
+            (make 'subproc
+                  :proc proc
+                  :tokens argv))))
         (t proc)))))
 
 (defun launch-program-in-dir* (tokens &rest args)
@@ -900,12 +944,13 @@ with `*null-error-output*'."
 
 ;;; From https://GitHub.com/GrammaTech/cl-utils/blob/master/shell.lisp
 ;;; (MIT license).
-(defun kill-process-group (process &key urgent)
+(defun kill-process-group (process &key urgent group)
   "Terminate PROCESS and all its descendants.
 On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
   (uiop:close-streams process)
   (kill-subprocs process :urgent urgent)
-  (if (and (os-unix-p)
+  (if (and group
+           (os-unix-p)
            ;; ECL doesn't start a new process group for
            ;; launch-program, so this would kill the Lisp process.
            (not (eql :ecl (uiop:implementation-type))))
@@ -918,12 +963,28 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
             (process-info-pid process)
             +tr+)
        :ignore-error-status t)
-      ;; If non-unix, utilize the standard terminate process
-      ;; which should be acceptable in most cases.
-      (uiop:terminate-process process :urgent urgent)))
+      ;; If non-unix, or if the process exited normally, utilize the
+      ;; standard terminate process which should be acceptable in most
+      ;; cases.
+      (when (uiop:process-alive-p process)
+        (uiop:terminate-process process :urgent urgent))))
+
+(defun handle-status (proc &key tokens ignore-error-status)
+  (let ((status (uiop:wait-process proc)))
+    (cond ((zerop status)
+           status)
+          (ignore-error-status
+           status)
+          (t
+           (cerror "IGNORE-ERROR-STATUS"
+                   'uiop:subprocess-error
+                   :command tokens
+                   :code status
+                   :process proc)
+           status))))
 
 (-> await (process-info &key (:ignore-error-status t) (:tokens list))
-  fixnum)
+    fixnum)
 (defun await (proc &key ignore-error-status tokens)
   "Wait for PROC to finish."
   (nest
@@ -937,23 +998,15 @@ On Unix, sends a TERM signal by default, or a KILL signal if URGENT."
    (let ((abnormal? t)))
    (unwind-protect
         (prog1
-            (let ((status (uiop:wait-process proc)))
-              (cond ((zerop status)
-                     status)
-                    (ignore-error-status
-                     status)
-                    (t
-                     (cerror "IGNORE-ERROR-STATUS"
-                             'uiop:subprocess-error
-                             :command tokens
-                             :code status
-                             :process proc)
-                     status)))
+            (handle-status proc
+                           :ignore-error-status ignore-error-status
+                           :tokens tokens)
           (setf abnormal? nil))
      (progn
        (uiop:close-streams proc)
        (when abnormal?
-         (kill-process-group proc))))))
+         (kill-process-group proc)
+         (kill-subprocs proc))))))
 
 (defun parse-cmd-args (args &key (split t))
   "Lex ARGs.

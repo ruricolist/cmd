@@ -83,11 +83,8 @@
 (unix-test pipefail
   (signals subprocess-error
     (cmd "bash -c 'echo hello; exit 1'" :> nil))
-  ;; TODO This doesn't work on CCL or SBCL. The problem is that the
-  ;; exit code actually gets set to zero.
-  ;; (signals subprocess-error
-  ;;   (cmd "bash -c 'echo hello; exit 1' | rev"))
-  )
+  (signals subprocess-error
+    (cmd "bash -c 'echo hello; exit 1' | rev" :> nil)))
 
 (unix-test tokenize-regression
   (is-true (cmd? "echo \"sleep 5000\" | grep -qo -e 'sleep 5000'")))
