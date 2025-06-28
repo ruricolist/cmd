@@ -413,12 +413,11 @@ See `*visual-commands*'.")
                        (lambda (c)
                          (finish-output s)
                          (error
-                          (make-condition
-                           'cmd-error
-                           :process (uiop:subprocess-error-process c)
-                           :command (uiop:subprocess-error-command c)
-                           :code (uiop:subprocess-error-code c)
-                           :stderr (get-stderr-output-stream-string s))))))
+                          'cmd-error
+                          :process (uiop:subprocess-error-process c)
+                          :command (uiop:subprocess-error-command c)
+                          :code (uiop:subprocess-error-code c)
+                          :stderr (get-stderr-output-stream-string s)))))
         (funcall fn s)))))
 
 (defmacro with-stderr-file ((var &key) &body body)
