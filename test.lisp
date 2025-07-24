@@ -248,3 +248,8 @@
         (parse-cmd-dsl '("echo 'hello world' > myfile")))
        '(("echo" "hello world")
          (:output "myfile")))))
+
+(test visual-command-regression
+  "Checking for a visual command shouldn't break on a path without a
+pathname-name."
+  (finishes (cmd "env -C / ls" :> nil)))

@@ -297,7 +297,8 @@ See `*visual-commands*'.")
 works."
   (setf command (flatten-string-tokens command))
   (labels ((basename (arg)
-             (namestring (pathname-name arg)))
+             (when-let (name (pathname-name arg))
+               (namestring name)))
            (flag? (arg)
              (string^= "-" arg))
            (variable? (arg)
@@ -309,9 +310,10 @@ not in `*command-wrappers*'."
              (when command
                (if (or (flag? (first command))
                        (variable? (first command))
-                       (find (basename (first command))
-                             *command-wrappers*
-                             :test #'string=))
+                       (when-let (basename (basename (first command)))
+                         (find basename
+                               *command-wrappers*
+                               :test #'string=)))
                    (first-positional-argument (rest command))
                    (first command)))))
     (and-let* ((cmd (first-positional-argument command)))
