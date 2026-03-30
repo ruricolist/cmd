@@ -1029,7 +1029,9 @@ arguments."
 The OS-level current directory is per-process, not per thread. Using
 `chdir' could lead to race conditions. Instead, we arrange for the new
 process to change its own working directory."
-  (when (pathname-equal dir (getcwd))
+  (when (pathname-equal dir
+                        ;; The current directory might have been deleted
+                        (ignore-errors (getcwd)))
     (return-from wrap-with-dir tokens))
   (destructuring-bind (command . args) tokens
     (cond (*can-use-env-c*
